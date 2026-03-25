@@ -1,0 +1,63 @@
+<div x-show="view === 'cost_centers'" class="max-w-3xl mx-auto" x-cloak>
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+        <h3 class="text-xl font-black text-indigo-950 mb-6"
+            x-text="isEditingCC ? t('edit_cost_center') : t('add_new_cost_center')"></h3>
+        <div class="space-y-5">
+            <div class="flex flex-col md:flex-row gap-3">
+                <input type="text" x-model="newCC.name" :placeholder="t('cost_center_name')"
+                    @input.debounce.500ms="translateText(newCC.name, (val) => { newCC.name_chinese = val.zh; newCC.name_en = val.en; })"
+                    class="flex-1 border-2 border-slate-100 p-4 rounded-xl text-sm focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all">
+                <input type="text" x-model="newCC.name_chinese" :placeholder="'Name (Chinese)'"
+                    class="flex-1 border-2 border-slate-100 p-4 rounded-xl text-sm italic text-slate-500 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all">
+                <input type="text" x-model="newCC.name_en" :placeholder="'Name (English)'"
+                    class="flex-1 border-2 border-slate-100 p-4 rounded-xl text-sm italic text-slate-500 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all">
+            </div>
+            <textarea x-model="newCC.description" :placeholder="t('description') + ' (' + t('optional') + ')'"
+                @input.debounce.500ms="translateText(newCC.description, (val) => { newCC.description_en = val.en; })"
+                class="w-full border-2 border-slate-100 p-4 rounded-xl text-sm focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all"
+                rows="2"></textarea>
+            <div class="flex gap-3 pt-2">
+                <button @click="addCostCenter()" :disabled="isLoadingCC"
+                    class="bg-gradient-to-r from-indigo-600 to-indigo-500 text-white px-8 py-3.5 rounded-xl font-black flex-1 hover:from-indigo-700 hover:to-indigo-600 transition-all shadow-md shadow-indigo-200 disabled:opacity-50 hover:-translate-y-0.5"
+                    x-text="isLoadingCC ? t('saving_msg') : (isEditingCC ? t('update_data') : t('save_new_center'))"></button>
+                <button x-show="isEditingCC" @click="resetCC()"
+                    class="bg-slate-100 px-8 py-3.5 rounded-xl font-bold hover:bg-slate-200 transition-colors text-slate-700" x-text="t('cancel')"></button>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-2" x-text="t('auto_translate_msg')"></p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-100">
+        <div class="bg-gray-50 p-4 border-b">
+            <h3 class="font-bold text-gray-700" x-text="t('registered_centers')"></h3>
+        </div>
+        <table class="w-full text-right text-sm">
+            <thead class="bg-gray-100 text-gray-600">
+                <tr>
+                    <th class="p-4 border-b" x-text="t('name')"></th>
+                    <th class="p-4 border-b" x-text="t('description')"></th>
+                    <th class="p-4 border-b w-24" x-text="t('actions')"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="cc in costCenters" :key="cc.id">
+                    <tr class="border-b hover:bg-indigo-50 transition">
+                        <td class="p-4 font-semibold text-gray-800" x-text="locName(cc)"></td>
+                        <td class="p-4 text-gray-500" x-text="locDesc(cc) || '-'"></td>
+                        <td class="p-4 flex gap-3">
+                            <button @click="editCC(cc)"
+                                class="text-indigo-600 hover:text-indigo-800 transition transform hover:scale-110" :title="t('edit')">✏️</button>
+                            <button @click="deleteCC(cc.id)"
+                                class="text-red-600 hover:text-red-800 transition transform hover:scale-110" :title="t('delete')">🗑️</button>
+                        </td>
+                    </tr>
+                </template>
+                <template x-if="costCenters.length === 0">
+                    <tr>
+                        <td colspan="3" class="p-8 text-center text-gray-400 italic bg-gray-50" x-text="t('no_centers_msg')"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# Database
+*.db
+*.sqlite3
+backend/sqlite.db
+
+# Logs
+*.log
+
+# System/IDE
+.gemini/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+node_modules/
+dist/
+build/
+.next/
+.server/
+.agents/
+.agent/
+_agents/
+_agent/
+*.md
+
+# Media
+!README.md
+!walkthrough.md
+!implementation_plan.md

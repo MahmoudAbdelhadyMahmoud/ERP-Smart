@@ -1,0 +1,46 @@
+<!-- Header -->
+<header class="w-full bg-white border-b border-slate-200 px-8 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm backdrop-blur-md bg-white/95">
+    <!-- Right side: Title (Shows on Right in RTL) -->
+    <div class="flex items-center gap-4">
+        <h2 class="text-2xl font-black text-indigo-950 whitespace-nowrap" x-text="t('view_' + view)"></h2>
+    </div>
+
+    <!-- Left side: Utilities & Language (Moves to Left in RTL) -->
+    <div class="flex items-center gap-4">
+        <!-- Core Utilities -->
+        <div class="flex items-center gap-2 border-l border-slate-100 pl-4 h-8">
+            <template x-if="view === 'dashboard' || view === 'analytics'">
+                <div class="flex gap-2">
+                    <button @click="exportData('excel')" class="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all">Excel</button>
+                    <button @click="exportData('pdf')" class="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl text-xs font-black border border-rose-100 hover:bg-rose-100 transition-all">PDF</button>
+                </div>
+            </template>
+            <button @click="fetchData(); showToast(t('refresh_data'), 'success')"
+                class="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all border border-indigo-100 group shadow-sm active:scale-95"
+                :title="t('refresh_data')">
+                <span class="text-lg block group-hover:rotate-180 transition-transform duration-500">🔄</span>
+            </button>
+        </div>
+
+        <!-- Language Dropdown -->
+        <div class="relative" x-data="{ open: false }">
+            <button @click="open = !open" 
+                class="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200 group">
+                <span class="text-xl">🌏</span>
+                <span class="text-sm font-black text-slate-700 uppercase" x-text="lang"></span>
+                <span class="text-[10px] opacity-50 group-hover:opacity-100 transition-transform" :class="open ? 'rotate-180' : ''">▼</span>
+            </button>
+            <div x-show="open" @click.away="open = false" x-transition
+                class="absolute ltr:right-0 rtl:left-0 mt-2 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden py-2 shadow-indigo-100">
+                <template x-for="l in ['ar', 'zh', 'en']" :key="l">
+                    <button @click="lang = l; open = false" 
+                        class="w-full text-right px-4 py-3 hover:bg-indigo-50 flex items-center justify-between transition-colors"
+                        :class="lang === l ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600'">
+                        <span x-text="l === 'ar' ? 'العربية' : (l === 'zh' ? '中文 (简体)' : 'English')"></span>
+                        <span x-show="lang === l">✓</span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+</header>

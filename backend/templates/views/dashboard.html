@@ -1,0 +1,101 @@
+<div x-show="view === 'dashboard'" x-cloak>
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-8 transition-shadow hover:shadow-md">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 items-end">
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1" x-text="t('from_date')"></label>
+                <input type="date" x-model="filters.from_date" class="w-full bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 p-2.5 rounded-xl text-sm transition-all outline-none">
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1" x-text="t('to_date')"></label>
+                <input type="date" x-model="filters.to_date" class="w-full bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 p-2.5 rounded-xl text-sm transition-all outline-none">
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1" x-text="t('type')"></label>
+                <select x-model="filters.type_id" class="w-full bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 p-2.5 rounded-xl text-sm transition-all outline-none appearance-none">
+                    <option value="" x-text="t('all_types')"></option>
+                    <template x-for="et in expenseTypes" :key="et.id">
+                        <option :value="et.id" x-text="locName(et)"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1" x-text="t('cost_center')"></label>
+                <select x-model="filters.cc_id" class="w-full bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 p-2.5 rounded-xl text-sm transition-all outline-none appearance-none">
+                    <option value="" x-text="t('all_centers')"></option>
+                    <template x-for="cc in costCenters" :key="cc.id">
+                        <option :value="cc.id" x-text="locName(cc)"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="space-y-1.5 relative">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1" x-text="t('entry_number')"></label>
+                <div class="relative">
+                    <input type="text" x-model="filters.invoice_number" :placeholder="t('search_placeholder')" class="w-full bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 p-2.5 pr-8 rounded-xl text-sm transition-all outline-none font-mono">
+                    <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex justify-end gap-4">
+            <button @click="filters = {from_date:'', to_date:'', type_id:'', cc_id:'', invoice_number:''}"
+                class="text-xs font-bold text-red-500 hover:text-red-700 transition-colors uppercase tracking-tight" x-text="t('reset_filters')"></button>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden text-[13px]">
+        <table class="w-full text-right">
+            <thead class="bg-gray-50 border-b text-slate-500">
+                <tr>
+                    <th class="p-4">ID</th>
+                    <th class="p-4" x-text="t('date')"></th>
+                    <th class="p-4" x-text="t('entry_number')"></th>
+                    <th class="p-4" x-text="t('type')"></th>
+                    <th class="p-4" x-text="t('item_total')"></th>
+                    <th class="p-4" x-text="t('taxes')"></th>
+                    <th class="p-4" x-text="t('discount')"></th>
+                    <th class="p-4" x-text="t('net_total')"></th>
+                    <th class="p-4" x-text="t('cost_center')"></th>
+                    <th class="p-4" x-text="t('actions')"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(exp, index) in filteredExpenses" :key="exp.id">
+                    <tr class="border-b hover:bg-gray-50 transition-colors">
+                        <td class="p-4 font-mono text-gray-400" x-text="index + 1"></td>
+                        <td class="p-4 whitespace-nowrap" x-text="exp.date"></td>
+                        <td class="p-4 font-black text-slate-700" x-text="exp.invoice_number || ('EXP-' + exp.id)"></td>
+                        <td class="p-4">
+                            <template x-if="exp.items.length > 0">
+                                <div>
+                                    <div class="font-bold text-slate-800" x-text="locName(exp.items[0].type_rel) || exp.items[0].expense_type"></div>
+                                    <div class="text-[10px] text-indigo-500 italic" x-show="lang !== 'zh' && exp.items[0].type_rel?.name_chinese" x-text="exp.items[0].type_rel?.name_chinese"></div>
+                                    <div class="text-[10px] text-gray-400" x-show="exp.items.length === 1 && exp.items[0].product">
+                                        <span x-text="locName(exp.items[0].product)"></span>
+                                        <span class="italic text-indigo-400 ml-1" x-show="lang !== 'zh' && exp.items[0].product?.name_chinese" x-text="'(' + exp.items[0].product.name_chinese + ')'"></span>
+                                    </div>
+                                    <div class="text-[10px] text-indigo-400 font-bold mt-1" x-show="exp.items.length > 1"
+                                        x-text="'+ ' + (exp.items.length - 1) + ' ' + t('other_items')"></div>
+                                </div>
+                            </template>
+                            <template x-if="exp.items.length === 0">
+                                <div class="text-gray-400 italic" x-text="t('no_items')"></div>
+                            </template>
+                        </td>
+                        <td class="p-4 whitespace-nowrap" x-text="formatMoney(exp.amount_egp)"></td>
+                        <td class="p-4 whitespace-nowrap" x-text="formatMoney(exp.taxes)"></td>
+                        <td class="p-4 whitespace-nowrap" x-text="exp.discount_pct + '%'"></td>
+                        <td class="p-4 font-black text-indigo-700 whitespace-nowrap" x-text="formatMoney(exp.total)"></td>
+                        <td class="p-4">
+                            <div x-text="locName(exp.cost_center, 'unknown_item')"></div>
+                            <div class="text-[9px] text-indigo-400 italic" x-show="lang !== 'zh' && exp.cost_center?.name_chinese" x-text="exp.cost_center.name_chinese"></div>
+                        </td>
+                        <td class="p-4 flex gap-3 text-lg">
+                            <button @click="showDetails(exp)" class="text-indigo-600 hover:scale-110 p-1 transition-transform" :title="t('details')">👁️</button>
+                            <button @click="editExpense(exp)" class="text-blue-600 hover:scale-110 p-1 transition-transform" :title="t('edit')">✏️</button>
+                            <button @click="deleteExpense(exp.id)" class="text-red-500 hover:scale-110 p-1 transition-transform" :title="t('delete')">🗑️</button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>

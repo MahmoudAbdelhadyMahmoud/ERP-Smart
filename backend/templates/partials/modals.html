@@ -1,0 +1,194 @@
+<!-- Details Modal -->
+<div x-show="showDetailsModal"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" x-cloak>
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        @click.away="showDetailsModal = false">
+        <div class="p-4 border-b bg-indigo-900 text-white flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <h3 class="text-xl font-bold">تفاصيل الفاتورة</h3>
+                <div class="flex gap-2 mr-4" x-if="activeExpense">
+                    <button @click="exportData('excel', activeExpense.id)" 
+                        class="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] px-3 py-1 rounded-lg font-bold flex items-center gap-1 transition-all">
+                        <span>📊</span> Excel
+                    </button>
+                    <button @click="exportData('pdf', activeExpense.id)" 
+                        class="bg-rose-500 hover:bg-rose-600 text-white text-[10px] px-3 py-1 rounded-lg font-bold flex items-center gap-1 transition-all">
+                        <span>📄</span> PDF
+                    </button>
+                </div>
+            </div>
+            <button @click="showDetailsModal = false" class="text-2xl">&times;</button>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1">
+            <template x-if="activeExpense">
+                <div>
+                    <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+                        <div><span class="text-gray-500 font-bold">رقم القيد:</span> <span class="font-bold text-indigo-700" x-text="activeExpense.invoice_number || ('EXP-' + activeExpense.id)"></span></div>
+                        <div><span class="text-gray-500 font-bold">التاريخ:</span> <span x-text="activeExpense.date"></span></div>
+                        <div><span class="text-gray-500 font-bold">مركز التكلفة:</span> <span x-text="activeExpense.cost_center?.name || '-'"></span></div>
+                        <div class="col-span-2"><span class="text-gray-500 font-bold">ملاحظات:</span> <span x-text="activeExpense.notes || '-'"></span></div>
+                    </div>
+
+                    <table class="w-full text-right border-collapse mb-6">
+                        <thead>
+                            <tr class="bg-gray-50 text-xs">
+                                <th class="p-2 border">النوع (AR)</th>
+                                <th class="p-2 border">النوع (CH)</th>
+                                <th class="p-2 border">الوصف (AR)</th>
+                                <th class="p-2 border">الوصف (CH)</th>
+                                <th class="p-2 border">المبلغ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="item in activeExpense.items" :key="item.id">
+                                <tr class="text-xs">
+                                    <td class="p-2 border font-bold text-indigo-700">
+                                        <div x-text="item.type_rel?.name || '---'"></div>
+                                        <div class="text-[10px] text-gray-500 font-normal" x-show="item.product" x-text="'الصنف: ' + (item.product?.name || '')"></div>
+                                    </td>
+                                    <td class="p-2 border text-indigo-500 italic" x-text="item.type_rel?.name_chinese || '---'"></td>
+                                    <td class="p-2 border text-gray-700" x-text="item.description || '---'"></td>
+                                    <td class="p-2 border text-gray-400 italic" x-text="item.description_chinese || '---'"></td>
+                                    <td class="p-2 border text-left font-mono" x-text="formatMoney(item.amount)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+
+                    <div class="bg-indigo-50 p-4 rounded-lg space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span>المجموع الفرعي:</span>
+                            <span class="font-bold" x-text="formatMoney(activeExpense.amount_egp) + ' ج.م'"></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>الضرائب:</span>
+                            <span class="font-bold" x-text="formatMoney(activeExpense.taxes) + ' ج.م'"></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>الخصم:</span>
+                            <span class="font-bold" x-text="activeExpense.discount_pct + '%'"></span>
+                        </div>
+                        <div class="flex justify-between text-xl font-black text-indigo-800 pt-2 border-t border-indigo-200">
+                            <span>الإجمالي النهائي:</span>
+                            <span x-text="formatMoney(activeExpense.total) + ' ج.م'"></span>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div class="p-4 border-t bg-gray-50 flex justify-end">
+            <button @click="showDetailsModal = false"
+                class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700">إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- Price History Modal -->
+<div x-show="priceHistoryOpen"
+    class="fixed inset-0 z-[150] bg-black bg-opacity-50 flex items-center justify-center p-4" x-cloak>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+        @click.away="priceHistoryOpen = false">
+        <div class="bg-indigo-900 text-white p-6 flex justify-between items-center">
+            <h3 class="text-xl font-bold" x-text="'سجل أسعار: ' + currentProductPriceHistory.product_name"></h3>
+            <button @click="priceHistoryOpen = false" class="text-2xl hover:text-gray-300">✕</button>
+        </div>
+        <div class="p-6 max-h-[70vh] overflow-y-auto">
+            <div x-show="currentProductPriceHistory.history.length > 0" class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
+                    <div class="text-xs text-blue-500 font-bold mb-1">أول سعر شراء مسجل</div>
+                    <div class="text-2xl font-black text-blue-900" x-text="formatMoney(currentProductPriceHistory.history[0].price) + ' ج.م'"></div>
+                    <div class="text-[10px] text-blue-400" x-text="currentProductPriceHistory.history[0].date"></div>
+                </div>
+                <div class="bg-green-50 p-4 rounded-xl border border-green-100 text-center">
+                    <div class="text-xs text-green-500 font-bold mb-1">آخر سعر شراء مسجل</div>
+                    <div class="text-2xl font-black text-green-900"
+                        x-text="formatMoney(currentProductPriceHistory.history[currentProductPriceHistory.history.length-1].price) + ' ج.م'">
+                    </div>
+                    <div class="text-[10px] text-green-400"
+                        x-text="currentProductPriceHistory.history[currentProductPriceHistory.history.length-1].date">
+                    </div>
+                </div>
+            </div>
+
+            <table class="w-full text-right border-collapse">
+                <thead class="bg-gray-100 sticky top-0">
+                    <tr>
+                        <th class="p-4 border-b">التاريخ</th>
+                        <th class="p-4 border-b">السعر</th>
+                        <th class="p-4 border-b">الكمية</th>
+                        <th class="p-4 border-b">المصدر</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <template x-for="h in currentProductPriceHistory.history" :key="h.date + h.price">
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-4" x-text="h.date"></td>
+                            <td class="p-4 font-bold text-indigo-700" x-text="formatMoney(h.price)"></td>
+                            <td class="p-4 text-gray-600" x-text="h.quantity"></td>
+                            <td class="p-4">
+                                <span class="px-2 py-1 rounded-full text-[10px] font-bold"
+                                    :class="h.source === 'مخزن' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'"
+                                    x-text="h.source"></span>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="currentProductPriceHistory.history.length === 0">
+                        <tr>
+                            <td colspan="4" class="p-8 text-center text-gray-400 italic">لا يوجد سجل أسعار مسجل حالياً</td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <div class="p-6 bg-gray-50 flex justify-end">
+            <button @click="priceHistoryOpen = false"
+                class="bg-gray-200 text-gray-700 px-6 py-2 rounded-xl font-bold hover:bg-gray-300 transition">إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- Movement History Modal -->
+<div x-show="showMovementHistoryModal"
+    class="fixed inset-0 z-[150] bg-black bg-opacity-50 flex items-center justify-center p-4" x-cloak>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+        @click.away="showMovementHistoryModal = false">
+        <div class="bg-indigo-900 text-white p-6 flex justify-between items-center">
+            <h3 class="text-xl font-bold">سجل تعديلات الحركة</h3>
+            <button @click="showMovementHistoryModal = false" class="text-2xl hover:text-gray-300">✕</button>
+        </div>
+        <div class="p-6 max-h-[70vh] overflow-y-auto">
+            <template x-if="activeMovementHistory.length === 0">
+                <p class="text-center text-gray-500 py-8">لا توجد تعديلات مسجلة لهذه الحركة (أو أنها حركة جديدة).</p>
+            </template>
+            <div class="space-y-4">
+                <template x-for="log in activeMovementHistory" :key="log.id">
+                    <div class="border-l-4 border-indigo-500 bg-indigo-50 p-4 rounded-r-lg shadow-sm">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full"
+                                x-text="log.action === 'Update' ? 'تعديل' : (log.action === 'Create' ? 'إنشاء' : 'حذف')"></span>
+                            <span class="text-xs text-gray-400 font-mono"
+                                x-text="new Date(log.timestamp).toLocaleString('ar-EG')"></span>
+                        </div>
+                        <div class="text-sm">
+                            <div class="font-bold text-indigo-900 mb-1" x-text="'بواسطة: ' + log.user"></div>
+                            <div x-show="log.old_values" class="mt-2">
+                                <div class="text-xs font-bold text-red-500 mb-1">القيم السابقة:</div>
+                                <pre class="text-[10px] bg-white p-2 rounded border overflow-x-auto"
+                                    x-text="log.old_values"></pre>
+                            </div>
+                            <div x-show="log.new_values" class="mt-2">
+                                <div class="text-xs font-bold text-green-600 mb-1">القيم الجديدة:</div>
+                                <pre class="text-[10px] bg-white p-2 rounded border overflow-x-auto"
+                                    x-text="log.new_values"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        <div class="p-4 bg-gray-50 border-t flex justify-end">
+            <button @click="showMovementHistoryModal = false"
+                class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700">إغلاق</button>
+        </div>
+    </div>
+</div>

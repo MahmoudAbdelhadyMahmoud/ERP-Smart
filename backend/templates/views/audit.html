@@ -1,0 +1,74 @@
+<div x-show="view === 'audit'" x-cloak>
+    <div class="bg-white p-6 rounded-lg shadow max-w-4xl mx-auto">
+        <!-- Case 1: Audit Not Started yet -->
+        <div x-show="!currentAudit.id || currentAudit.is_active === 0" class="text-center py-12">
+            <div class="bg-indigo-50 p-8 rounded-2xl border-2 border-dashed border-indigo-200">
+                <span class="text-6xl mb-4 block">📝</span>
+                <h3 class="text-2xl font-black text-indigo-900 mb-2" x-text="t('start_monthly_audit')"></h3>
+                <p class="text-gray-500 mb-6">
+                    <span x-text="t('you_can_start_audit_manually')"></span>
+                    <br> <span class="text-red-500 font-bold" x-text="t('attention_system_will_lock')"></span>
+                </p>
+                <button @click="startAuditManual()"
+                    class="bg-indigo-600 text-white px-12 py-4 rounded-xl font-black text-xl shadow-lg hover:bg-indigo-700 transition" x-text="t('start_audit_now')"></button>
+                <button @click="skipAuditManual()"
+                    class="block mt-6 text-indigo-400 hover:text-indigo-600 underline text-sm max-w-max mx-auto" x-text="t('skip_audit_this_month')"></button>
+            </div>
+        </div>
+
+        <!-- Case 2: Audit Started or Completed -->
+        <div x-show="currentAudit.id && currentAudit.is_active === 1">
+            <div class="flex justify-between items-center border-b pb-4 mb-6">
+                <div>
+                    <h3 class="font-bold text-xl" x-text="t('actual_warehouse_audit')"></h3>
+                    <p class="text-sm text-gray-500" x-text="t('audit_date_label') + currentAudit.date"></p>
+                </div>
+                <div class="text-left">
+                    <span class="px-3 py-1 rounded-full text-xs font-bold"
+                        :class="currentAudit.is_completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                        x-text="currentAudit.is_completed ? t('completed_status') : t('in_progress_status')"></span>
+                </div>
+            </div>
+
+            <div x-show="!currentAudit.is_completed"
+                class="mb-6 bg-blue-50 p-4 rounded-lg border-r-4 border-blue-500 text-sm" x-text="t('enter_actual_quantities')">
+            </div>
+
+            <table class="w-full text-right mb-6">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="p-3" x-text="t('product_name')"></th>
+                        <th class="p-3" x-text="t('expected_quantity')"></th>
+                        <th class="p-3" x-text="t('actual_quantity')"></th>
+                        <th class="p-3" x-text="t('variance')"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="item in currentAudit.items" :key="item.product_id">
+                        <tr class="border-b">
+                            <td class="p-3">
+                                <div class="font-bold text-indigo-900" x-text="locName(item.product, 'unknown_item')"></div>
+                                <div class="text-[10px] text-indigo-400 italic" x-show="lang !== 'zh' && item.product?.name_chinese" x-text="item.product?.name_chinese"></div>
+                                <div class="text-[10px] text-gray-400 font-mono" x-text="item.product ? item.product.code : ''"></div>
+                            </td>
+                            <td class="p-3 text-gray-500" x-text="item.expected_quantity"></td>
+                            <td class="p-3">
+                                <input type="number" x-model="item.actual_quantity"
+                                    class="border p-2 rounded w-24" :disabled="currentAudit.is_completed">
+                            </td>
+                            <td class="p-3 font-bold"
+                                :class="item.actual_quantity - item.expected_quantity < 0 ? 'text-red-600' : 'text-green-600'"
+                                x-text="(item.actual_quantity - item.expected_quantity).toFixed(2)">
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+
+            <div x-show="!currentAudit.is_completed" class="flex justify-end">
+                <button @click="submitAudit()"
+                    class="bg-indigo-600 text-white px-10 py-3 rounded-lg font-bold shadow-lg hover:bg-indigo-700" x-text="t('approve_audit_and_unlock')"></button>
+            </div>
+        </div>
+    </div>
+</div>

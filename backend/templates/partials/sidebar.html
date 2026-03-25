@@ -1,0 +1,79 @@
+<!-- Sidebar -->
+<div class="w-72 bg-gradient-to-b from-indigo-950 to-indigo-900 text-white p-8 hidden md:block overflow-y-auto shadow-2xl z-10 ltr:border-r rtl:border-l border-indigo-800/50 sticky top-0 h-screen flex-shrink-0">
+    <h1 class="text-2xl font-black mb-8 border-b border-indigo-800 pb-4" x-text="t('financial_management')"></h1>
+
+    <nav class="space-y-4">
+        <!-- Expenses Section -->
+        <div>
+            <button @click="expensesDropdown = !expensesDropdown"
+                class="flex items-center justify-between w-full py-2 px-4 rounded-lg bg-indigo-900 hover:bg-indigo-800 transition font-bold mb-2">
+                <span x-text="'💰 ' + t('expenses')"></span>
+                <span x-text="expensesDropdown ? '▲' : '▼'" class="text-[10px]"></span>
+            </button>
+            <div x-show="expensesDropdown" x-transition class="ps-4 space-y-1">
+                <button @click="navigate('dashboard')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'dashboard' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('expense_log')"></button>
+                <button @click="navigate('register_expense')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800 text-indigo-200"
+                    :class="view === 'register_expense' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('register_new_expense')"></button>
+                <button @click="navigate('expense_types')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'expense_types' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('expense_types')"></button>
+                <button @click="navigate('cost_centers')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'cost_centers' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('cost_centers')"></button>
+                <button @click="navigate('analytics')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'analytics' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('ai_analytics')"></button>
+            </div>
+        </div>
+
+        <!-- Warehouse Section -->
+        <div>
+            <button @click="warehouseDropdown = !warehouseDropdown"
+                class="flex items-center justify-between w-full py-2 px-4 rounded-lg bg-indigo-900 hover:bg-indigo-800 transition font-bold mb-2">
+                <span x-text="'📦 ' + t('warehouse')"></span>
+                <span x-text="warehouseDropdown ? '▲' : '▼'" class="text-[10px]"></span>
+            </button>
+            <div x-show="warehouseDropdown" x-transition class="ps-4 space-y-1">
+                <button @click="navigate('warehouse', 'items')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'warehouse' && warehouseView === 'items' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('register_codes_items')"></button>
+                <button @click="navigate('warehouse', 'movements')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'warehouse' && warehouseView === 'movements' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('warehouse_balances_movements')"></button>
+                <button @click="navigate('warehouse', 'locations')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'warehouse' && warehouseView === 'locations' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('warehouse_locations')"></button>
+                <button @click="navigate('warehouse', 'transfers')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'warehouse' && warehouseView === 'transfers' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('warehouse_transfers')"></button>
+                <button @click="navigate('warehouse', 'bulk_entry')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'warehouse' && warehouseView === 'bulk_entry' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="'⚡ ' + t('bulk_entry')"></button>
+                <button @click="navigate('audit')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                    :class="view === 'audit' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('monthly_audit')"></button>
+                <button @click="navigate('opening_balances')"
+                    class="block w-full text-start py-2 px-4 rounded text-sm hover:bg-indigo-800 text-indigo-200"
+                    :class="view === 'opening_balances' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'" x-text="t('opening_balances')"></button>
+            </div>
+        </div>
+
+        <!-- Costing Section -->
+        <div>
+            <button @click="navigate('costing')"
+                class="flex items-center justify-between w-full py-2 px-4 rounded-lg bg-indigo-900 hover:bg-indigo-800 transition font-bold mb-2"
+                :class="view === 'costing' ? 'bg-indigo-700 ring-2 ring-indigo-400' : ''">
+                <span x-text="'⚙️ ' + t('costing_manufacturing')"></span>
+            </button>
+        </div>
+
+    </nav>
+
+    <div class="mt-8 pt-8 border-t border-indigo-900">
+        <div class="text-xs text-indigo-400 mb-1" x-text="t('total_period_expenses')"></div>
+        <div class="text-xl font-black text-white" x-text="formatMoney(totalSum) + ' ' + t('currency')"></div>
+    </div>
+</div>

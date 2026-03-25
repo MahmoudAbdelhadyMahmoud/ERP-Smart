@@ -1,0 +1,225 @@
+<div x-show="view === 'register_expense'" x-cloak>
+    <div class="bg-white/80 backdrop-blur-lg p-8 rounded-3xl shadow-sm border border-slate-100 mb-6">
+        <div class="flex justify-between items-center mb-8">
+            <h3 class="text-2xl font-black text-indigo-900"
+                x-text="isEditing ? t('edit_invoice') : t('register_new_invoice')"></h3>
+            <div class="flex gap-2">
+                <button @click="window.location.href='/expenses/template'" class="bg-slate-50 text-slate-600 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 font-bold text-xs" x-text="t('import_template')"></button>
+                <button @click="$refs.expenseFile.click()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 font-bold text-xs shadow-lg transition" x-text="t('import_excel')"></button>
+                <input type="file" x-ref="expenseFile" class="hidden" @change="importExpenses($event)">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+            <div class="space-y-2">
+                <label class="block text-sm font-black text-gray-700 mr-1" x-text="t('invoice_date')"></label>
+                <input type="date" x-model="formData.date"
+                    class="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-lg">
+            </div>
+            <div class="space-y-2">
+                <label class="block text-sm font-black text-gray-700 mr-1" x-text="t('related_cost_center')"></label>
+                <select x-model="formData.cost_center_id"
+                    class="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-lg bg-white">
+                    <option value="" x-text="t('select_cost_center')"></option>
+                    <template x-for="cc in costCenters" :key="cc.id">
+                        <option :value="cc.id" x-text="locName(cc)"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="space-y-2">
+                <label class="block text-sm font-black text-gray-700 mr-1" x-text="t('invoice_number_optional')"></label>
+                <input type="text" x-model="formData.invoice_number" :placeholder="t('auto_gen_if_empty')"
+                    class="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-lg">
+            </div>
+            <div class="space-y-2 md:col-span-2">
+                <label class="block text-sm font-black text-indigo-700 mr-1" x-text="t('unified_expense_type_label') + ' (' + t('optional') + ')'"></label>
+                <div class="flex gap-2">
+                    <select x-model="default_expense_type_id" @change="applyDefaultType()"
+                        class="flex-1 border-2 border-indigo-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-lg bg-indigo-50">
+                        <option value="" x-text="t('select_type') + '...'"></option>
+                        <template x-for="et in expenseTypes" :key="et.id">
+                            <option :value="et.id" x-text="locName(et)"></option>
+                        </template>
+                    </select>
+                    <button @click="applyDefaultType()"
+                        class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-bold hover:bg-indigo-200 transition" x-text="t('apply_to_all')"></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-black text-indigo-900" x-text="t('invoice_items')"></h3>
+            <button @click="addItemRow()"
+                class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold transition shadow-lg" x-text="t('add_new_row')"></button>
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border-2 border-gray-100 mb-8">
+            <table class="w-full text-right border-collapse">
+                <thead>
+                    <tr class="bg-indigo-900 text-white text-sm">
+                        <th class="p-4 border-b font-bold w-12 text-center">#</th>
+                        <th class="p-4 border-b font-bold" x-text="t('item_optional')"></th>
+                        <th class="p-4 border-b font-bold" x-text="t('type')"></th>
+                        <th class="p-4 border-b font-bold" x-text="t('description')"></th>
+                        <th class="p-4 border-b font-bold" x-text="t('chinese_name')"></th>
+                        <th class="p-4 border-b font-bold" x-text="'English' + ' ' + t('description')"></th>
+                        <th class="p-4 border-b font-bold text-center" x-text="t('quantity')"></th>
+                        <th class="p-4 border-b font-bold text-center" x-text="t('price')"></th>
+                        <th class="p-4 border-b font-bold text-center" x-text="t('tax')"></th>
+                        <th class="p-4 border-b font-bold text-center" x-text="t('discount')"></th>
+                        <th class="p-4 border-b font-bold text-center" x-text="t('total')"></th>
+                        <th class="p-4 border-b font-bold text-center" x-text="t('remove')"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <template x-for="(item, index) in formData.items" :key="index">
+                        <tr class="hover:bg-indigo-50">
+                            <td class="p-4 text-center font-bold text-gray-400 text-xs" x-text="index + 1"></td>
+                            <td class="p-4">
+                                <div class="relative" x-data="{ 
+                                    open: false, 
+                                    search: locName(products.find(p => p.id == item.product_id)),
+                                    init() {
+                                        this.$watch('item.product_id', (val) => {
+                                            const p = products.find(x => x.id == val);
+                                            this.search = locName(p);
+                                        });
+                                    }
+                                }">
+                                    <input type="text" x-model="search" @focus="open = true" @input="open = true" @click.away="setTimeout(() => open = false, 200)"
+                                        class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs" 
+                                        :placeholder="t('search_placeholder')">
+                                    
+                                    <div x-show="open" x-transition class="absolute z-50 w-full mt-2 bg-white border-2 border-slate-100 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                                        <template x-for="p in products.filter(p => !search || p.name.includes(search) || (p.name_chinese && p.name_chinese.includes(search)) || (p.code && p.code.includes(search)))" :key="p.id">
+                                            <div @click="item.product_id = p.id; search = p.name; open = false" 
+                                                class="p-2 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors text-right">
+                                                <div class="text-[11px] font-bold text-slate-800" x-text="locName(p)"></div>
+                                                <div class="text-[9px] text-indigo-400 italic" x-show="lang !== 'zh' && p.name_chinese" x-text="p.name_chinese"></div>
+                                                <div class="text-[9px] text-gray-400 font-bold" x-text="p.code ? '[' + p.code + ']' : ''"></div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-4">
+                                <select x-model="item.expense_type_id"
+                                    class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs">
+                                    <option value="" x-text="t('select_type') + '...'"></option>
+                                    <template x-for="et in expenseTypes" :key="et.id">
+                                        <option :value="et.id" x-text="locName(et)"></option>
+                                    </template>
+                                </select>
+                            </td>
+                            <td class="p-4">
+                                <input type="text" x-model="item.description"
+                                    @input.debounce.500ms="translateText(item.description, (val) => { item.description_chinese = val.zh; item.description_en = val.en; })"
+                                    class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs"
+                                    :placeholder="t('description_label')">
+                            </td>
+                            <td class="p-4">
+                                <input type="text" x-model="item.description_chinese"
+                                    class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs italic text-gray-400"
+                                    :placeholder="t('chinese_auto')">
+                            </td>
+                            <td class="p-4">
+                                <input type="text" x-model="item.description_en"
+                                    class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs italic text-teal-400"
+                                    :placeholder="'English auto...'">
+                            </td>
+                            <td class="p-4">
+                                <input type="number" step="0.01" x-model="item.quantity" @input="updateItemTotal(item)"
+                                    class="w-16 border-b focus:border-indigo-500 p-2 text-center outline-none bg-transparent font-mono text-xs">
+                            </td>
+                            <td class="p-4">
+                                <input type="number" step="0.01" x-model="item.unit_price" @input="updateItemTotal(item)"
+                                    class="w-20 border-b focus:border-indigo-500 p-2 text-center outline-none bg-transparent font-mono text-xs">
+                            </td>
+                            <td class="p-4">
+                                <div class="flex flex-col gap-1">
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-[10px] text-gray-400" x-text="t('egp')"></span>
+                                        <input type="number" step="0.01" x-model="item.tax" @input="updateItemTaxFromAmount(item)"
+                                            class="w-14 border-b focus:border-indigo-500 p-1 text-center outline-none bg-transparent font-mono text-[10px] text-red-500">
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-[10px] text-gray-400">%</span>
+                                        <input type="number" step="0.1" x-model="item.tax_pct" @input="updateItemTaxFromPct(item)"
+                                            class="w-14 border-b focus:border-indigo-500 p-1 text-center outline-none bg-transparent font-mono text-[10px] text-red-400">
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-4">
+                                <div class="flex flex-col gap-1">
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-[10px] text-gray-400" x-text="t('egp')"></span>
+                                        <input type="number" step="0.01" x-model="item.discount" @input="updateItemDiscountFromAmount(item)"
+                                            class="w-14 border-b focus:border-indigo-500 p-1 text-center outline-none bg-transparent font-mono text-[10px] text-green-600">
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-[10px] text-gray-400">%</span>
+                                        <input type="number" step="0.1" x-model="item.discount_pct" @input="updateItemDiscountFromPct(item)"
+                                            class="w-14 border-b focus:border-indigo-500 p-1 text-center outline-none bg-transparent font-mono text-[10px] text-green-500">
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-4">
+                                <input type="number" x-model="item.amount" @input="updateSubtotal()"
+                                    class="w-24 border-b focus:border-indigo-500 p-2 text-left outline-none bg-transparent font-mono font-bold text-indigo-700 text-xs">
+                            </td>
+                            <td class="p-4 text-center">
+                                <button @click="removeItem(index)" class="text-red-400 hover:text-red-600">✕</button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div class="lg:col-span-2 space-y-4">
+                <label class="block text-sm font-black text-gray-700" x-text="t('general_notes')"></label>
+                <textarea x-model="formData.notes"
+                    class="w-full border-2 border-gray-100 p-4 rounded-2xl focus:border-indigo-500 outline-none transition min-h-[100px] bg-gray-50"
+                    :placeholder="t('additional_notes')"></textarea>
+                <button @click="getRecommendation()"
+                    class="bg-indigo-50 text-indigo-700 px-6 py-2 rounded-xl font-bold hover:bg-indigo-100 transition flex items-center gap-2">
+                    <span x-text="t('ai_suggest_type')"></span>
+                </button>
+            </div>
+            <div class="bg-indigo-900 text-white p-6 rounded-3xl shadow-xl space-y-4">
+                <div class="flex justify-between items-center border-b border-indigo-800 pb-2">
+                    <span class="text-indigo-200 text-sm" x-text="t('items_total_label')"></span>
+                    <span class="font-bold font-mono" x-text="formatMoney(formData.amount_egp)"></span>
+                </div>
+                <div class="grid grid-cols-2 gap-4 border-b border-indigo-800 pb-4">
+                    <div>
+                        <label class="block text-[10px] text-indigo-300" x-text="t('taxes_amount')"></label>
+                        <input type="number" step="0.01" x-model="formData.taxes" @input="updateTaxFromAmount()"
+                            class="w-full bg-indigo-800 border-none p-2 rounded text-center text-white outline-none font-mono text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-indigo-300" x-text="t('discount') + ' (%)'"></label>
+                        <input type="number" step="0.1" x-model="formData.discount_pct" @input="updateDiscountFromPct()"
+                            class="w-full bg-indigo-800 border-none p-2 rounded text-center text-white outline-none font-mono text-sm">
+                    </div>
+                </div>
+                <div class="flex justify-between items-end pt-2">
+                    <div class="text-right">
+                        <span class="text-indigo-200 text-sm font-bold block" x-text="t('net_total_label')"></span>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-3xl font-black font-mono text-white" x-text="formatMoney(formData.total)"></div>
+                        <div class="text-[10px] text-indigo-300" x-text="t('egyptian_pound')"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 flex gap-4">
+            <button @click="addExpense()"
+                class="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white py-4 rounded-2xl font-black text-xl shadow-lg transition-all hover:-translate-y-1" x-text="t('save_data')"></button>
+            <button @click="navigate('dashboard')" class="bg-gray-100 text-gray-500 px-8 py-4 rounded-2xl font-bold text-xl" x-text="t('cancel')"></button>
+        </div>
+    </div>
+</div>

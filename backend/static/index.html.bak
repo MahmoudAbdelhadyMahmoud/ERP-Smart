@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المصروفات الذكي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-200" x-data="expenseApp()">
+    <!-- System Locked Overlay -->
+    <div x-show="systemLocked && view !== 'audit'"
+        class="fixed inset-0 z-[100] bg-black bg-opacity-80 flex flex-col items-center justify-center text-white p-6 text-center"
+        x-cloak>
+        <div class="bg-red-600 p-8 rounded-2xl shadow-2xl max-w-lg border-4 border-white">
+            <span class="text-6xl mb-4">🚫</span>
+            <h1 class="text-3xl font-bold mb-4">النظام متوقف مؤقتاً</h1>
+            <p class="text-xl mb-6">يجب تسجيل جرد المخزن الفعلي لنهاية الشهر الماضي قبل مواصلة العمل على النظام.</p>
+            <button @click="navigate('audit')"
+                class="bg-white text-red-600 px-8 py-3 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-lg mb-4 w-full">
+                انتقل لصفحة الجرد الآن
+            </button>
+            <button @click="skipAuditManual()"
+                class="text-white text-sm underline opacity-80 hover:opacity-100 block w-full text-center">
+                تخطي الجرد لفتح النظام الآن
+            </button>
+        </div>
+    </div>
+
+    <div class="min-h-screen flex">
+        <!-- Sidebar -->
+        <div
+            class="w-72 bg-gradient-to-b from-indigo-950 to-indigo-900 text-white p-8 hidden md:block overflow-y-auto shadow-2xl z-10 border-l border-indigo-800/50">
+            <h1 class="text-2xl font-black mb-8 border-b border-indigo-800 pb-4">الإدارة المالية</h1>
+
+            <nav class="space-y-4">
+                <!-- Expenses Section -->
+                <div>
+                    <button @click="expensesDropdown = !expensesDropdown"
+                        class="flex items-center justify-between w-full py-2 px-4 rounded-lg bg-indigo-900 hover:bg-indigo-800 transition font-bold mb-2">
+                        <span>💰 المصروفات</span>
+                        <span x-text="expensesDropdown ? '▲' : '▼'" class="text-[10px]"></span>
+                    </button>
+                    <div x-show="expensesDropdown" x-transition class="pr-4 space-y-1">
+                        <button @click="navigate('dashboard')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'dashboard' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">سجل
+                            المصروفات</button>
+                        <button @click="navigate('register_expense')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800 text-indigo-200"
+                            :class="view === 'register_expense' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">تسجيل
+                            مصروف جديد +</button>
+                        <button @click="navigate('expense_types')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'expense_types' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">أنواع
+                            المصروفات</button>
+                        <button @click="navigate('cost_centers')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'cost_centers' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">مراكز
+                            التكلفة</button>
+                        <button @click="navigate('analytics')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'analytics' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">التحليلات
+                            الذكية</button>
+                    </div>
+                </div>
+
+                <!-- Warehouse Section -->
+                <div>
+                    <button @click="warehouseDropdown = !warehouseDropdown"
+                        class="flex items-center justify-between w-full py-2 px-4 rounded-lg bg-indigo-900 hover:bg-indigo-800 transition font-bold mb-2">
+                        <span>📦 المخزن</span>
+                        <span x-text="warehouseDropdown ? '▲' : '▼'" class="text-[10px]"></span>
+                    </button>
+                    <div x-show="warehouseDropdown" x-transition class="pr-4 space-y-1">
+                        <button @click="navigate('warehouse', 'items')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'warehouse' && warehouseView === 'items' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">تسجيل
+                            الأكواد/الأصناف</button>
+                        <button @click="navigate('warehouse', 'movements')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'warehouse' && warehouseView === 'movements' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">أرصدة
+                            وحركات المخزن</button>
+                        <button @click="navigate('warehouse', 'locations')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'warehouse' && warehouseView === 'locations' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">إدارة
+                            مواقع المخازن</button>
+                        <button @click="navigate('warehouse', 'transfers')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'warehouse' && warehouseView === 'transfers' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">تحويل
+                            بين المخازن</button>
+                        <button @click="navigate('audit')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800"
+                            :class="view === 'audit' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">الجرد
+                            الشهري</button>
+                        <button @click="navigate('opening_balances')"
+                            class="block w-full text-right py-2 px-4 rounded text-sm hover:bg-indigo-800 text-indigo-200"
+                            :class="view === 'opening_balances' ? 'bg-indigo-700 font-bold' : 'text-indigo-200'">الأرصدة
+                            الافتتاحية</button>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="mt-8 pt-8 border-t border-indigo-900">
+                <div class="text-xs text-indigo-400 mb-1">إجمالي مصروفات الفترة</div>
+                <div class="text-xl font-black text-white" x-text="formatMoney(totalSum) + ' ج.م'"></div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header -->
+            <header
+                class="bg-white/80 backdrop-blur-md shadow-sm p-6 flex justify-between items-center border-b border-slate-100 sticky top-0 z-40">
+                <h2 class="text-2xl font-black text-indigo-950 flex items-center gap-3"
+                    x-text="view === 'dashboard' ? 'سجل المصروفات' : (view === 'cost_centers' ? 'مراكز التكلفة' : (view === 'expense_types' ? 'أنواع المصروفات' : (view === 'warehouse' ? 'إدارة المخزن' : (view === 'audit' ? 'الجرد الشهري' : 'تحليلات المصروفات'))))">
+                </h2>
+                <div class="flex gap-3">
+                    <button
+                        @click="fetchData(); if(view === 'warehouse') fetchWarehouseData(); showToast('تم تحديث البيانات', 'success')"
+                        class="bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2.5 rounded-xl hover:bg-indigo-100 flex items-center gap-2 text-sm font-bold transition-all"
+                        title="تحديث البيانات">
+                        <span>🔄</span>
+                    </button>
+                    <button @click="exportData('excel')"
+                        class="bg-emerald-50 text-emerald-600 border border-emerald-200 px-5 py-2.5 rounded-xl hover:bg-emerald-100 flex items-center gap-2 text-sm font-bold transition-all hover:-translate-y-0.5">
+                        <span class="text-lg">📊</span> تصدير Excel
+                    </button>
+                    <button @click="exportData('pdf')"
+                        class="bg-rose-50 text-rose-600 border border-rose-200 px-5 py-2.5 rounded-xl hover:bg-rose-100 flex items-center gap-2 text-sm font-bold transition-all hover:-translate-y-0.5">
+                        <span class="text-lg">📄</span> تصدير PDF
+                    </button>
+                    <button @click="navigate('register_expense')"
+                        class="bg-gradient-to-r from-indigo-600 to-indigo-500 text-white px-6 py-2.5 rounded-xl hover:from-indigo-700 hover:to-indigo-600 text-sm font-black flex items-center shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5">
+                        إضافة مصروف <span class="mr-2 text-lg leading-none">+</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="p-6">
+                <!-- Dashboard View -->
+                <div x-show="view === 'dashboard'">
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-8 transition-shadow hover:shadow-md">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div>
+                                <label class="block text-sm mb-1">من تاريخ</label>
+                                <input type="date" x-model="filters.from_date"
+                                    class="w-full border p-2 rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-1">إلى تاريخ</label>
+                                <input type="date" x-model="filters.to_date" class="w-full border p-2 rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-1">النوع</label>
+                                <select x-model="filters.type_id" class="w-full border p-2 rounded text-sm">
+                                    <option value="">كل الأنواع</option>
+                                    <template x-for="et in expenseTypes" :key="et.id">
+                                        <option :value="et.id" x-text="et.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-1">مركز التكلفة</label>
+                                <select x-model="filters.cc_id" class="w-full border p-2 rounded text-sm">
+                                    <option value="">كل المراكز</option>
+                                    <template x-for="cc in costCenters" :key="cc.id">
+                                        <option :value="cc.id" x-text="cc.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-end">
+                            <button @click="filters = {from_date:'', to_date:'', type_id:'', cc_id:''}"
+                                class="text-sm text-red-600 hover:underline">إعادة ضبط الفلاتر</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <table class="w-full text-right">
+                            <thead class="bg-gray-50 border-b">
+                                <tr>
+                                    <th class="p-4">النوع</th>
+                                    <th class="p-4">التاريخ</th>
+                                    <th class="p-4">المبلغ</th>
+                                    <th class="p-4">الضرائب</th>
+                                    <th class="p-4">الخصم</th>
+                                    <th class="p-4">الإجمالي</th>
+                                    <th class="p-4">مركز التكلفة</th>
+                                    <th class="p-4">ملاحظات</th>
+                                    <th class="p-4">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="exp in filteredExpenses" :key="exp.id">
+                                    <tr class="border-b hover:bg-gray-50">
+                                        <td class="p-4">
+                                            <div class="font-bold"
+                                                x-text="exp.items.length > 0 ? exp.items[0].expense_type : 'بدون بنود'">
+                                            </div>
+                                            <div class="text-[10px] text-gray-400" x-show="exp.items.length > 1"
+                                                x-text="'+ ' + (exp.items.length - 1) + ' بنود أخرى'"></div>
+                                        </td>
+                                        <td class="p-4" x-text="exp.date"></td>
+                                        <td class="p-4" x-text="formatMoney(exp.amount_egp)"></td>
+                                        <td class="p-4" x-text="formatMoney(exp.taxes)"></td>
+                                        <td class="p-4" x-text="exp.discount_pct + '%'"></td>
+                                        <td class="p-4 font-bold" x-text="formatMoney(exp.total)"></td>
+                                        <td class="p-4" x-text="exp.cost_center ? exp.cost_center.name : '-'"></td>
+                                        <td class="p-4 text-gray-500 text-sm" x-text="exp.notes"></td>
+                                        <td class="p-4 flex gap-2">
+                                            <button @click="showDetails(exp)"
+                                                class="text-indigo-600 hover:text-indigo-800"
+                                                title="تفاصيل">👁️</button>
+                                            <button @click="editExpense(exp)" class="text-blue-600 hover:text-blue-800"
+                                                title="تعديل">✏️</button>
+                                            <button @click="deleteExpense(exp.id)"
+                                                class="text-red-600 hover:text-red-800" title="حذف">🗑️</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cost Centers View -->
+                <div x-show="view === 'cost_centers'" class="max-w-3xl mx-auto">
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+                        <h3 class="text-xl font-black text-indigo-950 mb-6"
+                            x-text="isEditingCC ? 'تعديل مركز تكلفة' : 'إضافة مركز تكلفة جديد'"></h3>
+                        <div class="space-y-5">
+                            <input type="text" x-model="newCC.name" placeholder="اسم مركز التكلفة"
+                                class="w-full border-2 border-slate-100 p-4 rounded-xl text-sm focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all">
+                            <textarea x-model="newCC.description" placeholder="الوصف (اختياري)"
+                                class="w-full border-2 border-slate-100 p-4 rounded-xl text-sm focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all"
+                                rows="2"></textarea>
+                            <div class="flex gap-3 pt-2">
+                                <button @click="addCostCenter()" :disabled="isLoadingCC"
+                                    class="bg-gradient-to-r from-indigo-600 to-indigo-500 text-white px-8 py-3.5 rounded-xl font-black flex-1 hover:from-indigo-700 hover:to-indigo-600 transition-all shadow-md shadow-indigo-200 disabled:opacity-50 hover:-translate-y-0.5"
+                                    x-text="isLoadingCC ? 'جاري الحفظ...' : (isEditingCC ? 'تحديث البيانات' : 'حفظ المركز الجديد')"></button>
+                                <button x-show="isEditingCC" @click="resetCC()"
+                                    class="bg-slate-100 px-8 py-3.5 rounded-xl font-bold hover:bg-slate-200 transition-colors text-slate-700">إلغاء</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-100">
+                        <div class="bg-gray-50 p-4 border-b">
+                            <h3 class="font-bold text-gray-700">المراكز المسجلة الحالية</h3>
+                        </div>
+                        <table class="w-full text-right text-sm">
+                            <thead class="bg-gray-100 text-gray-600">
+                                <tr>
+                                    <th class="p-4 border-b">الاسم</th>
+                                    <th class="p-4 border-b">الوصف</th>
+                                    <th class="p-4 border-b w-24">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="cc in costCenters" :key="cc.id">
+                                    <tr class="border-b hover:bg-indigo-50 transition">
+                                        <td class="p-4 font-semibold text-gray-800" x-text="cc.name"></td>
+                                        <td class="p-4 text-gray-500" x-text="cc.description || '-'"></td>
+                                        <td class="p-4 flex gap-3">
+                                            <button @click="editCC(cc)"
+                                                class="text-indigo-600 hover:text-indigo-800 transition transform hover:scale-110"
+                                                title="تعديل">✏️</button>
+                                            <button @click="deleteCC(cc.id)"
+                                                class="text-red-600 hover:text-red-800 transition transform hover:scale-110"
+                                                title="حذف">🗑️</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-if="costCenters.length === 0">
+                                    <tr>
+                                        <td colspan="3" class="p-8 text-center text-gray-400 italic bg-gray-50">
+                                            لا توجد مراكز تكلفة مسجلة حالياً
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Expense Types View -->
+                <div x-show="view === 'expense_types'" class="max-w-2xl mx-auto">
+                    <div class="bg-white p-6 rounded-lg shadow mb-6">
+                        <h3 class="font-bold mb-4" x-text="isEditingET ? 'تعديل نوع المصروف' : 'إضافة نوع مصروف جديد'">
+                        </h3>
+                        <div class="flex gap-4">
+                            <input type="text" x-model="newET.name" placeholder="اسم النوع (بالعربي)"
+                                class="flex-1 border p-2 rounded">
+                            <button @click="addExpenseType()" class="bg-indigo-600 text-white px-6 py-2 rounded"
+                                x-text="isEditingET ? 'تحديث' : 'حفظ'"></button>
+                            <button x-show="isEditingET" @click="resetET()"
+                                class="bg-gray-200 px-4 py-2 rounded">إلغاء</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">* سيتم ترجمة الاسم للصينية تلقائياً عند الحفظ</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow">
+                        <template x-for="et in expenseTypes" :key="et.id">
+                            <div class="p-4 border-b flex justify-between items-center hover:bg-gray-50">
+                                <div>
+                                    <span class="font-semibold" x-text="et.name"></span>
+                                    <span class="text-gray-400 mx-2">|</span>
+                                    <span class="text-indigo-600" x-text="et.name_chinese"></span>
+                                </div>
+                                <div class="flex gap-3">
+                                    <button @click="editET(et)" class="text-blue-600 hover:text-blue-800"
+                                        title="تعديل">✏️</button>
+                                    <button @click="deleteET(et.id)" class="text-red-600 hover:text-red-800"
+                                        title="حذف">🗑️</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Analytics View -->
+                <div x-show="view === 'analytics'">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div
+                            class="bg-emerald-500 text-white p-6 rounded-2xl shadow-lg shadow-emerald-100 flex items-center justify-between">
+                            <div>
+                                <div class="text-emerald-50 text-sm font-bold mb-1">إجمالي مصروفات الفترة الحالية</div>
+                                <div class="text-3xl font-black" x-text="formatMoney(totalSum) + ' ج.م'"></div>
+                            </div>
+                            <span class="text-4xl opacity-30">💰</span>
+                        </div>
+                        <div
+                            class="bg-indigo-500 text-white p-6 rounded-2xl shadow-lg shadow-indigo-100 flex items-center justify-between">
+                            <div>
+                                <div class="text-indigo-50 text-sm font-bold mb-1">عدد العمليات المسجلة</div>
+                                <div class="text-3xl font-black" x-text="filteredExpenses.length + ' عملية'"></div>
+                            </div>
+                            <span class="text-4xl opacity-30">📋</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Types Table -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="font-bold mb-4 border-b pb-2">إجمالي المصروفات حسب النوع</h3>
+                            <table class="w-full text-right">
+                                <template x-for="(total, type) in analyticsSummary" :key="type">
+                                    <tr class="border-b">
+                                        <td class="py-3 font-semibold" x-text="type"></td>
+                                        <td class="py-3 text-indigo-600 font-bold" x-text="formatMoney(total) + ' ج.م'">
+                                        </td>
+                                    </tr>
+                                </template>
+                            </table>
+                        </div>
+
+                        <!-- Chart -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="font-bold mb-4 border-b pb-2">توزيع المصروفات (رسم بياني)</h3>
+                            <canvas id="expenseChart" width="400" height="300"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Recommendations -->
+                    <div class="mt-6 bg-yellow-50 border-r-4 border-yellow-500 p-6 rounded shadow">
+                        <h3 class="font-bold mb-3 flex items-center gap-2">
+                            <span>💡</span> توصيات النظام الذكية
+                        </h3>
+                        <ul class="list-disc list-inside space-y-2 text-gray-700">
+                            <template x-for="rec in recommendations" :key="rec">
+                                <li x-text="rec"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Warehouse View -->
+                <div x-show="view === 'warehouse'">
+                    <!-- Warehouse Dashboard Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div
+                            class="bg-indigo-600 text-white p-6 rounded-2xl shadow-lg shadow-indigo-100 flex items-center justify-between">
+                            <div>
+                                <div class="text-indigo-100 text-sm font-bold mb-1">إجمالي قيمة المخزون (بالتكلفة)</div>
+                                <div class="text-3xl font-black"
+                                    x-text="formatMoney(products.reduce((s,p) => s + (p.current_stock * p.average_cost), 0)) + ' ج.م'">
+                                </div>
+                            </div>
+                            <span class="text-4xl opacity-30">📦</span>
+                        </div>
+                        <div class="bg-amber-500 text-white p-6 rounded-2xl shadow-lg shadow-amber-100 flex items-center justify-between"
+                            :class="products.filter(p => p.current_stock <= p.reorder_level).length > 0 ? 'bg-red-500' : ''">
+                            <div>
+                                <div class="text-amber-50 text-sm font-bold mb-1">أصناف تحتاج لطلب (نواقص)</div>
+                                <div class="text-3xl font-black"
+                                    x-text="products.filter(p => p.current_stock <= p.reorder_level).length + ' صنف'">
+                                </div>
+                            </div>
+                            <span class="text-4xl opacity-30">⚠️</span>
+                        </div>
+                    </div>
+
+                    <!-- Sub-navigation for Warehouse -->
+                    <div class="flex gap-4 mb-6 border-b pb-2">
+                        <button @click="warehouseView = 'movements'" class="px-4 py-2 font-bold transition"
+                            :class="warehouseView === 'movements' ? 'border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-400'">أرصدة
+                            وحركات المخزن</button>
+                        <button @click="warehouseView = 'items'" class="px-4 py-2 font-bold transition"
+                            :class="warehouseView === 'items' ? 'border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-400'">تسجيل
+                            الأكواد والأصناف</button>
+                        <button @click="warehouseView = 'locations'" class="px-4 py-2 font-bold transition"
+                            :class="warehouseView === 'locations' ? 'border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-400'">مواقع
+                            المخازن</button>
+                        <button @click="warehouseView = 'transfers'" class="px-4 py-2 font-bold transition"
+                            :class="warehouseView === 'transfers' ? 'border-b-4 border-indigo-600 text-indigo-700' : 'text-gray-400'">تحويل
+                            بين المخازن</button>
+                    </div>
+
+                    <!-- Item Registration Section -->
+                    <div x-show="warehouseView === 'items'">
+                        <!-- Stock Analysis Chart -->
+                        <div class="bg-white p-6 rounded-xl shadow-lg border mb-8">
+                            <h3 class="font-bold mb-4 flex items-center gap-2 text-indigo-900">
+                                📊 تحليل مخزون الأصناف الحالية
+                            </h3>
+                            <div class="h-64">
+                                <canvas id="stockChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Product Registration -->
+                        <div class="bg-white p-6 rounded-xl shadow-lg border-r-4 border-indigo-500 mb-8">
+                            <h3 class="font-bold mb-6 flex items-center gap-2 text-indigo-900 text-xl">
+                                <span class="bg-indigo-100 p-2 rounded-lg text-lg">📦</span>
+                                <span x-text="isEditingProduct ? 'تعديل بيانات صنف' : 'تسجيل صنف جديد'"></span>
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-600 mb-1">كود الصنف</label>
+                                    <input type="text" x-model="newProduct.code" placeholder="سيتم توليده آلياً"
+                                        class="w-full border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition bg-gray-50"
+                                        :disabled="isEditingProduct">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-600 mb-1">اسم الصنف / المنتج</label>
+                                    <input type="text" x-model="newProduct.name" placeholder="مثلاً: زيت محرك 5W30"
+                                        class="w-full border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-600 mb-1">الوحدة</label>
+                                    <input type="text" x-model="newProduct.unit" placeholder="مثلاً: لتر، كرتونة، قطعة"
+                                        list="unitSuggestions"
+                                        class="w-full border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
+                                    <datalist id="unitSuggestions">
+                                        <option value="كجم">
+                                        <option value="لتر">
+                                        <option value="قطعة">
+                                        <option value="كرتونة">
+                                        <option value="باكيت">
+                                        <option value="جالون">
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-600 mb-1">متوسط سعر الوحدة
+                                        (تلقائي)</label>
+                                    <input type="number" x-model="newProduct.average_cost" placeholder="0.00"
+                                        class="w-full border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition bg-blue-50 font-bold"
+                                        readonly title="يتم حسابه تلقائياً من المشتريات">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-600 mb-1">آخر سعر شراء</label>
+                                    <input type="number" x-model="newProduct.purchase_price" placeholder="0.00"
+                                        class="w-full border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition bg-green-50 font-bold"
+                                        readonly title="يتم تحديثه مع كل عملية شراء جديدة">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-600 mb-1">حد الطلب (Alert
+                                        Level)</label>
+                                    <input type="number" x-model="newProduct.reorder_level" placeholder="0.00"
+                                        class="w-full border-2 p-3 rounded-xl focus:border-red-400 outline-none transition bg-red-50/30">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-600 mb-1">ملاحظات الصنف</label>
+                                    <textarea x-model="newProduct.notes"
+                                        placeholder="أى ملاحظات إضافية تخص هذا الصنف..."
+                                        class="w-full border-2 p-3 rounded-xl focus:border-indigo-500 outline-none transition h-[52px] resize-none"></textarea>
+                                </div>
+                                <div class="md:col-span-3 flex gap-2">
+                                    <button @click="addProduct()"
+                                        class="bg-indigo-600 text-white px-6 py-4 rounded-xl flex-1 font-black text-lg hover:bg-indigo-700 shadow-lg transition">
+                                        <span
+                                            x-text="isEditingProduct ? 'تحديث بيانات الصنف' : 'اعتماد وحفظ الصنف الجديد'"></span>
+                                    </button>
+                                    <template x-if="isEditingProduct">
+                                        <button @click="resetProduct()"
+                                            class="bg-gray-400 text-white px-6 py-4 rounded-xl font-bold hover:bg-gray-500 shadow-lg transition">
+                                            إلغاء
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Registered Items List -->
+                        <div class="bg-white rounded-xl shadow overflow-hidden border">
+                            <div class="p-4 bg-gray-50 border-b font-bold">قائمة الأصناف المسجلة</div>
+                            <table class="w-full text-right">
+                                <thead class="bg-gray-100 text-sm">
+                                    <tr>
+                                        <th class="p-4">كود الصنف</th>
+                                        <th class="p-4">الاسم</th>
+                                        <th class="p-4">الوحدة</th>
+                                        <th class="p-4">الرصيد الكلي</th>
+                                        <th class="p-4">حد الطلب</th>
+                                        <th class="p-4">متوسط السعر</th>
+                                        <th class="p-4">إجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="p in products" :key="p.id">
+                                        <tr class="border-b hover:bg-gray-50 text-sm"
+                                            :class="p.current_stock <= p.reorder_level ? 'bg-red-50' : ''">
+                                            <td class="p-4 text-gray-400 font-mono" x-text="p.code || ('#' + p.id)">
+                                            </td>
+                                            <td class="p-4 font-bold" x-text="p.name"></td>
+                                            <td class="p-4 text-gray-600" x-text="p.unit"></td>
+                                            <td class="p-4 font-black"
+                                                :class="p.current_stock <= p.reorder_level ? 'text-red-600' : 'text-indigo-600'"
+                                                x-text="p.current_stock"></td>
+                                            <td class="p-4 text-red-400 font-bold" x-text="p.reorder_level"></td>
+                                            <td class="p-4 text-gray-900 font-bold"
+                                                x-text="formatMoney(p.average_cost)"></td>
+                                            <td class="p-4 flex gap-1">
+                                                <button @click="showPriceHistory(p)"
+                                                    class="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition font-bold text-xs"
+                                                    title="سجل الأسعار">📊 سعر</button>
+                                                <button @click="editProduct(p)"
+                                                    class="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg border border-blue-200 hover:bg-blue-100 transition font-bold text-xs">تعديل</button>
+                                                <button @click="deleteProduct(p.id)"
+                                                    class="bg-red-50 text-red-600 px-3 py-1 rounded-lg border border-red-200 hover:bg-red-100 transition font-bold text-xs">حذف</button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div> <!-- End item registration -->
+
+                    <div x-show="warehouseView === 'movements'">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <!-- Movement Form -->
+                            <div class="bg-white p-6 rounded-xl shadow-lg border-r-4 border-green-500 md:col-span-1">
+                                <h3 class="font-bold mb-4 flex items-center gap-2">
+                                    <span>🔄</span> <span
+                                        x-text="isEditingMovement ? 'تعديل حركة' : 'تسجيل حركة'"></span>
+                                </h3>
+                                <div class="space-y-4">
+                                    <select x-model="newMovement.product_id" class="w-full border p-2 rounded-lg"
+                                        :disabled="isEditingMovement">
+                                        <option value="">اختر الصنف...</option>
+                                        <template x-for="p in products" :key="p.id">
+                                            <option :value="p.id"
+                                                x-text="(p.code ? '[' + p.code + '] ' : '') + p.name + ' (متاح: ' + p.current_stock + ')'">
+                                            </option>
+                                        </template>
+                                    </select>
+                                    <select x-model="newMovement.location_id" class="w-full border p-2 rounded-lg">
+                                        <option value="">اختر المخزن...</option>
+                                        <template x-for="loc in locations" :key="loc.id">
+                                            <option :value="loc.id" x-text="loc.name"></option>
+                                        </template>
+                                    </select>
+                                    <select x-model="newMovement.type" class="w-full border p-2 rounded-lg">
+                                        <option value="Addition">إضافة مخزنية (+)</option>
+                                        <option value="Disposal">صرف / إهلاك (-)</option>
+                                        <option value="Adjustment">تعديل رصيد (=)</option>
+                                    </select>
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1 font-bold">الكمية</label>
+                                        <input type="number" x-model="newMovement.quantity" placeholder="الكمية"
+                                            class="w-full border p-2 rounded-lg">
+                                    </div>
+                                    <template x-if="newMovement.type === 'Addition'">
+                                        <div>
+                                            <label class="block text-xs text-gray-500 mb-1 font-bold">السعر</label>
+                                            <input type="number" x-model="newMovement.unit_price"
+                                                placeholder="سعر الوحدة (اختياري)"
+                                                class="w-full border p-2 rounded-lg bg-indigo-50 border-indigo-200">
+                                        </div>
+                                    </template>
+                                    <input type="date" x-model="newMovement.date" class="w-full border p-2 rounded-lg">
+                                    <textarea x-model="newMovement.notes" placeholder="ملاحظات"
+                                        class="w-full border p-2 rounded-lg text-sm" rows="2"></textarea>
+                                    <div class="flex gap-2">
+                                        <button @click="addMovement()"
+                                            class="bg-green-600 text-white px-6 py-2 rounded-lg flex-1 font-bold hover:bg-green-700 transition"
+                                            x-text="isEditingMovement ? 'تحديث' : 'تسجيل الحركة'"></button>
+                                        <button x-show="isEditingMovement" @click="resetMovementForm()"
+                                            class="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm">إلغاء</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Products Table -->
+                            <div class="bg-white rounded-xl shadow-lg border md:col-span-2 overflow-hidden">
+                                <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                                    <h3 class="font-bold">أرصدة الأصناف الحالية</h3>
+                                    <div class="flex gap-2">
+                                        <button @click="recalculateStock()"
+                                            class="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 hover:bg-red-100">مزامنة
+                                            الأرصدة 🔄</button>
+                                        <button @click="fetchWarehouseData()"
+                                            class="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded">تحديث</button>
+                                    </div>
+                                </div>
+                                <div class="overflow-y-auto max-h-[400px]">
+                                    <table class="w-full text-right">
+                                        <thead class="bg-gray-100 sticky top-0">
+                                            <tr>
+                                                <th class="p-4">كود الصنف</th>
+                                                <th class="p-4">الصنف</th>
+                                                <th class="p-4">الرصيد</th>
+                                                <th class="p-4">الوحدة</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="p in products" :key="p.id">
+                                                <tr class="border-b hover:bg-indigo-50 cursor-pointer"
+                                                    @click="movementFilterProductId = (movementFilterProductId === p.id ? null : p.id)"
+                                                    :class="movementFilterProductId === p.id ? 'bg-indigo-100' : ''">
+                                                    <td class="p-4 text-xs font-mono text-gray-400" x-text="p.code">
+                                                    </td>
+                                                    <td class="p-4 font-bold" x-text="p.name"></td>
+                                                    <td class="p-4 font-black text-indigo-700 text-lg"
+                                                        x-text="p.current_stock"></td>
+                                                    <td class="p-4 text-gray-500 text-sm" x-text="p.unit"></td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <!-- Movements Log inside Movements sub-view -->
+                        <div class="bg-white rounded-xl shadow-lg border overflow-hidden mt-8" id="movementsLog">
+                            <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                                <h3 class="font-bold flex items-center gap-2">
+                                    <span>سجل الحركات الأخير</span>
+                                    <template x-if="movementFilterProductId">
+                                        <span
+                                            class="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1">
+                                            مصفى: <span
+                                                x-text="products.find(p => p.id == movementFilterProductId)?.name"></span>
+                                            <button @click="movementFilterProductId = null"
+                                                class="font-bold">&times;</button>
+                                        </span>
+                                    </template>
+                                </h3>
+                            </div>
+                            <div class="overflow-y-auto max-h-[400px]">
+                                <table class="w-full text-right text-sm">
+                                    <thead class="bg-gray-100 sticky top-0">
+                                        <tr>
+                                            <th class="p-4 text-[10px]">التاريخ</th>
+                                            <th class="p-4">المخزن</th>
+                                            <th class="p-4">الصنف</th>
+                                            <th class="p-4">النوع</th>
+                                            <th class="p-4">الكمية</th>
+                                            <th class="p-4">إجراء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="m in filteredMovements" :key="m.id">
+                                            <tr class="border-b hover:bg-gray-50">
+                                                <td class="p-4 text-[10px]" x-text="m.date"></td>
+                                                <td class="p-4 font-bold text-indigo-600"
+                                                    x-text="m.location ? m.location.name : '-'"></td>
+                                                <td class="p-4" x-text="m.product ? m.product.name : 'محذوف'"></td>
+                                                <td class="p-4 text-[10px]" x-text="m.type"></td>
+                                                <td class="p-4 font-bold" x-text="m.quantity"></td>
+                                                <td class="p-4 flex gap-1">
+                                                    <button @click="editMovement(m)" class="text-blue-500">✏️</button>
+                                                    <button @click="deleteMovement(m.id)"
+                                                        class="text-red-500">🗑️</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Locations Management Section -->
+                    <div x-show="warehouseView === 'locations'">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="bg-white p-6 rounded-xl shadow-lg border">
+                                <h3 class="font-bold mb-4">إضافة مخزن / موقع جديد</h3>
+                                <div class="space-y-4">
+                                    <input type="text" x-model="newLocation.name" placeholder="اسم المخزن"
+                                        class="w-full border p-3 rounded-xl">
+                                    <textarea x-model="newLocation.description" placeholder="الوصف"
+                                        class="w-full border p-3 rounded-xl h-24"></textarea>
+                                    <button @click="addLocation()"
+                                        class="bg-indigo-600 text-white w-full py-3 rounded-xl font-bold hover:bg-indigo-700">حفظ
+                                        الموقع</button>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-lg border overflow-hidden">
+                                <table class="w-full text-right">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="p-4">المخزن</th>
+                                            <th class="p-4">الوصف</th>
+                                            <th class="p-4">إجراء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="loc in locations" :key="loc.id">
+                                            <tr class="border-b">
+                                                <td class="p-4 font-bold" x-text="loc.name"></td>
+                                                <td class="p-4 text-gray-500" x-text="loc.description || '-'"></td>
+                                                <td class="p-4">
+                                                    <button @click="deleteLocation(loc.id)"
+                                                        class="text-red-600">🗑️</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Stock Per Location Report -->
+                        <div class="mt-8 bg-white p-6 rounded-xl shadow-lg border">
+                            <h3 class="font-black text-xl mb-6 text-indigo-900 border-b pb-4">توزيع المخزون على المواقع
+                                (تقرير تفصيلي)</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <template x-for="loc in stockPerLocation" :key="loc.id">
+                                    <div class="border-2 border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                        <div class="bg-slate-100 p-4 font-black flex justify-between">
+                                            <span x-text="loc.name"></span>
+                                            <span class="text-indigo-600 text-xs"
+                                                x-text="loc.stocks.length + ' صنف'"></span>
+                                        </div>
+                                        <div class="p-4 space-y-3">
+                                            <template x-for="st in loc.stocks" :key="st.product_id">
+                                                <div
+                                                    class="flex justify-between items-center text-sm border-b border-dotted pb-1">
+                                                    <span class="text-slate-700" x-text="st.product_name"></span>
+                                                    <span class="font-black text-indigo-900"
+                                                        x-text="st.quantity"></span>
+                                                </div>
+                                            </template>
+                                            <template x-if="loc.stocks.length === 0">
+                                                <p class="text-center text-gray-400 text-xs py-4">مخزن فارغ حالياً</p>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transfers Section -->
+                    <div x-show="warehouseView === 'transfers'">
+                        <div class="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-2xl border border-indigo-50">
+                            <h2 class="text-2xl font-black text-indigo-950 mb-8 flex items-center gap-3">
+                                <span class="bg-indigo-600 text-white p-2 rounded-xl text-lg">⇄</span>
+                                تحويل مخزني داخلي
+                            </h2>
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">الصنف المراد
+                                        تحويله</label>
+                                    <select x-model="transferData.product_id"
+                                        class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-indigo-500">
+                                        <option value="">اختر الصنف...</option>
+                                        <template x-for="p in products" :key="p.id">
+                                            <option :value="p.id"
+                                                x-text="p.name + ' (الإجمالي: ' + p.current_stock + ')'"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">من مخزن
+                                            (المصدر)</label>
+                                        <select x-model="transferData.from_location_id"
+                                            class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-indigo-500 bg-red-50/50">
+                                            <option value="">اختر المصدر...</option>
+                                            <template x-for="loc in locations" :key="loc.id">
+                                                <option :value="loc.id" x-text="loc.name"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">إلى مخزن
+                                            (الوجهة)</label>
+                                        <select x-model="transferData.to_location_id"
+                                            class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-indigo-500 bg-green-50/50">
+                                            <option value="">اختر الوجهة...</option>
+                                            <template x-for="loc in locations" :key="loc.id">
+                                                <option :value="loc.id" x-text="loc.name"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">الكمية المحولة</label>
+                                        <input type="number" x-model="transferData.quantity"
+                                            class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-indigo-500 font-black text-xl">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">تاريخ التحويل</label>
+                                        <input type="date" x-model="transferData.date"
+                                            class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-indigo-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">ملاحظات التحويل</label>
+                                    <textarea x-model="transferData.notes"
+                                        class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-indigo-500"
+                                        placeholder="سبب التحويل أو رقم إذن الصرف..."></textarea>
+                                </div>
+                                <button @click="createTransfer()"
+                                    class="bg-gradient-to-r from-indigo-600 to-indigo-500 text-white w-full py-5 rounded-3xl font-black text-xl shadow-xl hover:-translate-y-1 transition active:scale-95">
+                                    إتمام عملية التحويل الآن
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- End Warehouse View -->
+
+                <!-- Audit View -->
+                <div x-show="view === 'audit'">
+                    <div class="bg-white p-6 rounded-lg shadow max-w-4xl mx-auto">
+                        <!-- Case 1: Audit Not Started yet -->
+                        <div x-show="!currentAudit.id || currentAudit.is_active === 0" class="text-center py-12">
+                            <div class="bg-indigo-50 p-8 rounded-2xl border-2 border-dashed border-indigo-200">
+                                <span class="text-6xl mb-4 block">📝</span>
+                                <h3 class="text-2xl font-black text-indigo-900 mb-2">بدء الجرد الشهري</h3>
+                                <p class="text-gray-500 mb-6">يمكنك بدء عملية الجرد يدوياً الآن لتسجيل الأرصدة الفعلية.
+                                    <br> <span class="text-red-500 font-bold">تنبيه: سيتم قفل النظام تلقائياً بعد يوم 5
+                                        من الشهر إذا لم يتم الجرد.</span></p>
+                                <button @click="startAuditManual()"
+                                    class="bg-indigo-600 text-white px-12 py-4 rounded-xl font-black text-xl shadow-lg hover:bg-indigo-700 transition">
+                                    بدء عملية الجرد الآن
+                                </button>
+                                <button @click="skipAuditManual()"
+                                    class="block mt-6 text-indigo-400 hover:text-indigo-600 underline text-sm">
+                                    تخطي الجرد لهذا الشهر (مدير النظام)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Case 2: Audit Started or Completed -->
+                        <div x-show="currentAudit.id && currentAudit.is_active === 1">
+                            <div class="flex justify-between items-center border-b pb-4 mb-6">
+                                <div>
+                                    <h3 class="font-bold text-xl">جرد المخزن الفعلي</h3>
+                                    <p class="text-sm text-gray-500" x-text="'تاريخ الجرد: ' + currentAudit.date"></p>
+                                </div>
+                                <div class="text-left">
+                                    <span class="px-3 py-1 rounded-full text-xs font-bold"
+                                        :class="currentAudit.is_completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                                        x-text="currentAudit.is_completed ? 'مكتمل' : 'قيد التسجيل'"></span>
+                                </div>
+                            </div>
+
+                            <div x-show="!currentAudit.is_completed"
+                                class="mb-6 bg-blue-50 p-4 rounded-lg border-r-4 border-blue-500 text-sm">
+                                قم بإدخال الكميات الفعلية الموجودة في المخزن حالياً. سيقوم النظام بتعديل الرصيد تلقائياً
+                                بناءً على إدخالك.
+                            </div>
+
+                            <table class="w-full text-right mb-6">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="p-3">الصنف</th>
+                                        <th class="p-3">الرصيد الدفتري</th>
+                                        <th class="p-3">الرصيد الفعلي</th>
+                                        <th class="p-3">الفرق</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="item in currentAudit.items" :key="item.product_id">
+                                        <tr class="border-b">
+                                            <td class="p-3">
+                                                <div class="font-bold"
+                                                    x-text="item.product ? item.product.name : 'صنف غير معروف'"></div>
+                                                <div class="text-[10px] text-gray-400 font-mono"
+                                                    x-text="item.product ? item.product.code : ''"></div>
+                                            </td>
+                                            <td class="p-3 text-gray-500" x-text="item.expected_quantity"></td>
+                                            <td class="p-3">
+                                                <input type="number" x-model="item.actual_quantity"
+                                                    class="border p-2 rounded w-24"
+                                                    :disabled="currentAudit.is_completed">
+                                            </td>
+                                            <td class="p-3 font-bold"
+                                                :class="item.actual_quantity - item.expected_quantity < 0 ? 'text-red-600' : 'text-green-600'"
+                                                x-text="(item.actual_quantity - item.expected_quantity).toFixed(2)">
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+
+                            <div x-show="!currentAudit.is_completed" class="flex justify-end">
+                                <button @click="submitAudit()"
+                                    class="bg-indigo-600 text-white px-10 py-3 rounded-lg font-bold shadow-lg hover:bg-indigo-700">
+                                    اعتماد الجرد وفتح النظام
+                                </button>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Register/Edit Expense View (Inline) -->
+                <div x-show="view === 'register_expense'">
+                    <div class="bg-white/80 backdrop-blur-lg p-8 rounded-3xl shadow-sm border border-slate-100 mb-6">
+                                <h3 class="text-2xl font-black text-indigo-900 mb-8"
+                                    x-text="isEditing ? 'تعديل الفاتورة' : 'تسجيل فاتورة جديدة'"></h3>
+
+                                <div
+                                    class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                                    <div class="space-y-2">
+                                        <label class="block text-sm font-black text-gray-700 mr-1">تاريخ
+                                            الفاتورة</label>
+                                        <input type="date" x-model="formData.date"
+                                            class="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-lg">
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="block text-sm font-black text-gray-700 mr-1">مركز التكلفة
+                                            المرتبط</label>
+                                        <select x-model="formData.cost_center_id"
+                                            class="w-full border-2 border-gray-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-lg bg-white">
+                                            <option value="">اختر مركز التكلفة...</option>
+                                            <template x-for="cc in costCenters" :key="cc.id">
+                                                <option :value="cc.id" x-text="cc.name"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-2 md:col-span-2">
+                                        <label class="block text-sm font-black text-indigo-700 mr-1">نوع مصروف موحد
+                                            (اختياري - يطبق على جميع البنود)</label>
+                                        <div class="flex gap-2">
+                                            <select x-model="default_expense_type_id" @change="applyDefaultType()"
+                                                class="flex-1 border-2 border-indigo-200 p-3 rounded-xl focus:border-indigo-500 outline-none text-lg bg-indigo-50">
+                                                <option value="">اختر نوع مصروف موحد...</option>
+                                                <template x-for="et in expenseTypes" :key="et.id">
+                                                    <option :value="et.id" x-text="et.name"></option>
+                                                </template>
+                                            </select>
+                                            <button @click="applyDefaultType()"
+                                                class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-bold hover:bg-indigo-200 transition">تطبيق
+                                                على الكل</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-xl font-black text-indigo-900">بنود وأصناف الفاتورة</h3>
+                                    <button @click="addItemRow()"
+                                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold transition shadow-lg">+
+                                        إضافة سطر جديد</button>
+                                </div>
+
+                                <div class="overflow-x-auto rounded-2xl border-2 border-gray-100 mb-8">
+                                    <table class="w-full text-right border-collapse">
+                                        <thead>
+                                            <tr class="bg-indigo-900 text-white text-sm">
+                                                <th class="p-4 border-b font-bold w-12 text-center">#</th>
+                                                <th class="p-4 border-b font-bold">الصنف (اختياري)</th>
+                                                <th class="p-4 border-b font-bold">نوع المصروف</th>
+                                                <th class="p-4 border-b font-bold">الوصف</th>
+                                                <th class="p-4 border-b font-bold text-center">الكمية</th>
+                                                <th class="p-4 border-b font-bold text-center">السعر</th>
+                                                <th class="p-4 border-b font-bold text-center">الإجمالي</th>
+                                                <th class="p-4 border-b font-bold text-center">حذف</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <template x-for="(item, index) in formData.items" :key="index">
+                                                <tr class="hover:bg-indigo-50">
+                                                    <td class="p-4 text-center font-bold text-gray-400 text-xs"
+                                                        x-text="index + 1"></td>
+                                                    <td class="p-4">
+                                                        <select x-model="item.product_id"
+                                                            class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs">
+                                                            <option value="">-- غير مرتبط --</option>
+                                                            <template x-for="p in products" :key="p.id">
+                                                                <option :value="p.id" x-text="p.name"></option>
+                                                            </template>
+                                                        </select>
+                                                    </td>
+                                                    <td class="p-4">
+                                                        <select x-model="item.expense_type_id"
+                                                            class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs">
+                                                            <option value="">اختر النوع...</option>
+                                                            <template x-for="et in expenseTypes" :key="et.id">
+                                                                <option :value="et.id" x-text="et.name"></option>
+                                                            </template>
+                                                        </select>
+                                                    </td>
+                                                    <td class="p-4">
+                                                        <input type="text" x-model="item.description"
+                                                            class="w-full border-b focus:border-indigo-500 p-2 outline-none bg-transparent text-xs"
+                                                            placeholder="البيان...">
+                                                    </td>
+                                                    <td class="p-4">
+                                                        <input type="number" step="0.01" x-model="item.quantity"
+                                                            @input="updateItemTotal(item)"
+                                                            class="w-20 border-b focus:border-indigo-500 p-2 text-center outline-none bg-transparent font-mono text-xs">
+                                                    </td>
+                                                    <td class="p-4">
+                                                        <input type="number" step="0.01" x-model="item.unit_price"
+                                                            @input="updateItemTotal(item)"
+                                                            class="w-24 border-b focus:border-indigo-500 p-2 text-center outline-none bg-transparent font-mono text-xs">
+                                                    </td>
+                                                    <td class="p-4">
+                                                        <input type="number" x-model="item.amount"
+                                                            @input="updateSubtotal()"
+                                                            class="w-24 border-b focus:border-indigo-500 p-2 text-left outline-none bg-transparent font-mono font-bold text-indigo-700 text-xs">
+                                                    </td>
+                                                    <td class="p-4 text-center">
+                                                        <button @click="removeItem(index)"
+                                                            class="text-red-400 hover:text-red-600">✕</button>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                                    <div class="lg:col-span-2 space-y-4">
+                                        <label class="block text-sm font-black text-gray-700">ملاحظات عامة</label>
+                                        <textarea x-model="formData.notes"
+                                            class="w-full border-2 border-gray-100 p-4 rounded-2xl focus:border-indigo-500 outline-none transition min-h-[100px] bg-gray-50"
+                                            placeholder="ملاحظات إضافية..."></textarea>
+                                        <button @click="getRecommendation()"
+                                            class="bg-indigo-50 text-indigo-700 px-6 py-2 rounded-xl font-bold hover:bg-indigo-100 transition flex items-center gap-2">
+                                            <span>💡</span> اقتراح نوع المصروف بالذكاء الاصطناعي
+                                        </button>
+                                    </div>
+                                    <div class="bg-indigo-900 text-white p-6 rounded-3xl shadow-xl space-y-4">
+                                        <div class="flex justify-between items-center border-b border-indigo-800 pb-2">
+                                            <span class="text-indigo-200 text-sm">إجمالي البنود:</span>
+                                            <span class="font-bold font-mono"
+                                                x-text="formatMoney(formData.amount_egp)"></span>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4 border-b border-indigo-800 pb-4">
+                                            <div>
+                                                <label class="block text-[10px] text-indigo-300">الضرائب (مبلغ)</label>
+                                                <input type="number" step="0.01" x-model="formData.taxes"
+                                                    @input="updateTaxFromAmount()"
+                                                    class="w-full bg-indigo-800 border-none p-2 rounded text-center text-white outline-none font-mono text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] text-indigo-300">الخصم (%)</label>
+                                                <input type="number" step="0.1" x-model="formData.discount_pct"
+                                                    @input="updateDiscountFromPct()"
+                                                    class="w-full bg-indigo-800 border-none p-2 rounded text-center text-white outline-none font-mono text-sm">
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-between items-end pt-2">
+                                            <div class="text-right">
+                                                <span class="text-indigo-200 text-sm font-bold block">صافي
+                                                    الإجمالي</span>
+                                            </div>
+                                            <div class="text-left">
+                                                <div class="text-3xl font-black font-mono text-white"
+                                                    x-text="formatMoney(formData.total)"></div>
+                                                <div class="text-[10px] text-indigo-300">جنيه مصري</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                        <div class="mt-12 flex gap-4">
+                            <button @click="addExpense()"
+                                class="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white py-4 rounded-2xl font-black text-xl shadow-lg transition-all hover:-translate-y-1">حفظ
+                                البيانات</button>
+                            <button @click="navigate('dashboard')"
+                                class="bg-gray-100 text-gray-500 px-8 py-4 rounded-2xl font-bold text-xl">إلغاء</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opening Balances View (Inline) -->
+                <div x-show="view === 'opening_balances'">
+                    <div class="bg-white p-8 rounded-3xl shadow-lg border border-slate-100">
+                        <div class="flex justify-between items-center mb-8">
+                            <div>
+                                <h3 class="text-2xl font-black text-indigo-900">إدارة الأرصدة الافتتاحية</h3>
+                                <p class="text-gray-500 mt-1">يمكنك ضبط رصيد البداية لكل صنف في النظام</p>
+                            </div>
+                            <div class="flex gap-4">
+                                <button @click="approveCurrentBalances()"
+                                    class="bg-emerald-50 text-emerald-700 px-6 py-3 rounded-xl font-bold hover:bg-emerald-100 transition flex items-center gap-2 border border-emerald-100">
+                                    <span>✅</span> اعتماد الرصيد الحالي
+                                </button>
+                                <button @click="saveOpeningBalances()"
+                                    class="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black hover:bg-indigo-700 transition shadow-lg flex items-center gap-2">
+                                    <span>💾</span> حفظ الأرصدة المدخلة
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-hidden rounded-2xl border-2 border-gray-100 shadow-sm">
+                            <table class="w-full text-right border-collapse">
+                                <thead class="bg-indigo-950 text-white">
+                                    <tr>
+                                        <th class="p-5 font-bold">الكود</th>
+                                        <th class="p-5 font-bold">اسم المنتج</th>
+                                        <th class="p-5 font-bold">الوحدة</th>
+                                        <th class="p-5 font-bold">الرصيد الحالي</th>
+                                        <th class="p-5 font-bold text-center">الكمية الافتتاحية</th>
+                                        <th class="p-5 font-bold text-center">سعر الوحدة</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <template x-if="isLoadingOpening">
+                                        <tr>
+                                            <td colspan="6" class="p-10 text-center text-gray-400">جاري تحميل
+                                                البيانات...</td>
+                                        </tr>
+                                    </template>
+                                    <template x-for="b in openingBalances" :key="b.id">
+                                        <tr class="hover:bg-slate-50 transition-colors">
+                                            <td class="p-5 font-mono text-gray-400 text-sm" x-text="b.code">
+                                            </td>
+                                            <td class="p-5 font-bold text-indigo-900" x-text="b.name"></td>
+                                            <td class="p-5 text-gray-500 text-sm" x-text="b.unit"></td>
+                                            <td class="p-5 font-black text-lg text-slate-700"
+                                                x-text="b.current_stock"></td>
+                                            <td class="p-5">
+                                                <input type="number" x-model="b.qty"
+                                                    class="w-32 mx-auto block border-2 border-gray-100 p-2 rounded-lg text-center font-mono focus:border-indigo-400 outline-none">
+                                            </td>
+                                            <td class="p-5">
+                                                <input type="number" step="0.01" x-model="b.price"
+                                                    class="w-32 mx-auto block border-2 border-gray-100 p-2 rounded-lg text-center font-mono focus:border-indigo-400 outline-none">
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Details Modal -->
+        <div x-show="showDetailsModal"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" x-cloak>
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+                @click.away="showDetailsModal = false">
+                <div class="p-4 border-b bg-indigo-900 text-white flex justify-between items-center">
+                    <h3 class="text-xl font-bold">تفاصيل الفاتورة</h3>
+                    <button @click="showDetailsModal = false" class="text-2xl">&times;</button>
+                </div>
+                <div class="p-6 overflow-y-auto flex-1">
+                    <template x-if="activeExpense">
+                        <div>
+                            <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+                                <div><span class="text-gray-500 font-bold">التاريخ:</span> <span
+                                        x-text="activeExpense.date"></span></div>
+                                <div><span class="text-gray-500 font-bold">مركز التكلفة:</span> <span
+                                        x-text="activeExpense.cost_center?.name || '-'"></span></div>
+                                <div class="col-span-2"><span class="text-gray-500 font-bold">ملاحظات:</span> <span
+                                        x-text="activeExpense.notes || '-'"></span></div>
+                            </div>
+
+                            <table class="w-full text-right border-collapse mb-6">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="p-2 border">النوع</th>
+                                        <th class="p-2 border">الوصف</th>
+                                        <th class="p-2 border">المبلغ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="item in activeExpense.items" :key="item.id">
+                                        <tr>
+                                            <td class="p-2 border font-semibold text-indigo-700"
+                                                x-text="item.expense_type"></td>
+                                            <td class="p-2 border text-gray-600" x-text="item.description"></td>
+                                            <td class="p-2 border text-left font-mono"
+                                                x-text="formatMoney(item.amount)"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+
+                            <div class="bg-indigo-50 p-4 rounded-lg space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span>المجموع الفرعي:</span>
+                                    <span class="font-bold"
+                                        x-text="formatMoney(activeExpense.amount_egp) + ' ج.م'"></span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>الضرائب:</span>
+                                    <span class="font-bold" x-text="formatMoney(activeExpense.taxes) + ' ج.م'"></span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>الخصم:</span>
+                                    <span class="font-bold" x-text="activeExpense.discount_pct + '%'"></span>
+                                </div>
+                                <div
+                                    class="flex justify-between text-xl font-black text-indigo-800 pt-2 border-t border-indigo-200">
+                                    <span>الإجمالي النهائي:</span>
+                                    <span x-text="formatMoney(activeExpense.total) + ' ج.م'"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="p-4 border-t bg-gray-50 flex justify-end">
+                    <button @click="showDetailsModal = false"
+                        class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700">إغلاق</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Price History Modal -->
+    <div x-show="priceHistoryOpen"
+        class="fixed inset-0 z-[150] bg-black bg-opacity-50 flex items-center justify-center p-4" x-cloak>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+            @click.away="priceHistoryOpen = false">
+            <div class="bg-indigo-900 text-white p-6 flex justify-between items-center">
+                <h3 class="text-xl font-bold" x-text="'سجل أسعار: ' + currentProductPriceHistory.product_name"></h3>
+                <button @click="priceHistoryOpen = false" class="text-2xl hover:text-gray-300">✕</button>
+            </div>
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <div x-show="currentProductPriceHistory.history.length > 0" class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
+                        <div class="text-xs text-blue-500 font-bold mb-1">أول سعر شراء مسجل</div>
+                        <div class="text-2xl font-black text-blue-900"
+                            x-text="formatMoney(currentProductPriceHistory.history[0].price) + ' ج.م'"></div>
+                        <div class="text-[10px] text-blue-400" x-text="currentProductPriceHistory.history[0].date">
+                        </div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-xl border border-green-100 text-center">
+                        <div class="text-xs text-green-500 font-bold mb-1">آخر سعر شراء مسجل</div>
+                        <div class="text-2xl font-black text-green-900"
+                            x-text="formatMoney(currentProductPriceHistory.history[currentProductPriceHistory.history.length-1].price) + ' ج.م'">
+                        </div>
+                        <div class="text-[10px] text-green-400"
+                            x-text="currentProductPriceHistory.history[currentProductPriceHistory.history.length-1].date">
+                        </div>
+                    </div>
+                </div>
+
+                <table class="w-full text-right border-collapse">
+                    <thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="p-4 border-b">التاريخ</th>
+                            <th class="p-4 border-b">السعر</th>
+                            <th class="p-4 border-b">الكمية</th>
+                            <th class="p-4 border-b">المصدر</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <template x-for="h in currentProductPriceHistory.history" :key="h.date + h.price">
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="p-4" x-text="h.date"></td>
+                                <td class="p-4 font-bold text-indigo-700" x-text="formatMoney(h.price)"></td>
+                                <td class="p-4 text-gray-600" x-text="h.quantity"></td>
+                                <td class="p-4">
+                                    <span class="px-2 py-1 rounded-full text-[10px] font-bold"
+                                        :class="h.source === 'مخزن' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'"
+                                        x-text="h.source"></span>
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-if="currentProductPriceHistory.history.length === 0">
+                            <tr>
+                                <td colspan="4" class="p-8 text-center text-gray-400 italic">لا يوجد سجل أسعار مسجل
+                                    حالياً</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-6 bg-gray-50 flex justify-end">
+                <button @click="priceHistoryOpen = false"
+                    class="bg-gray-200 text-gray-700 px-6 py-2 rounded-xl font-bold hover:bg-gray-300 transition">إغلاق</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Movement History Modal -->
+    <div x-show="showMovementHistoryModal"
+        class="fixed inset-0 z-[150] bg-black bg-opacity-50 flex items-center justify-center p-4" x-cloak>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+            @click.away="showMovementHistoryModal = false">
+            <div class="bg-indigo-900 text-white p-6 flex justify-between items-center">
+                <h3 class="text-xl font-bold">سجل تعديلات الحركة</h3>
+                <button @click="showMovementHistoryModal = false" class="text-2xl hover:text-gray-300">✕</button>
+            </div>
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <template x-if="activeMovementHistory.length === 0">
+                    <p class="text-center text-gray-500 py-8">لا توجد تعديلات مسجلة لهذه الحركة (أو أنها حركة جديدة).
+                    </p>
+                </template>
+                <div class="space-y-4">
+                    <template x-for="log in activeMovementHistory" :key="log.id">
+                        <div class="border-l-4 border-indigo-500 bg-indigo-50 p-4 rounded-r-lg shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full"
+                                    x-text="log.action === 'Update' ? 'تعديل' : (log.action === 'Create' ? 'إنشاء' : 'حذف')"></span>
+                                <span class="text-xs text-gray-400 font-mono"
+                                    x-text="new Date(log.timestamp).toLocaleString('ar-EG')"></span>
+                            </div>
+                            <div class="text-sm">
+                                <div class="font-bold text-indigo-900 mb-1" x-text="'بواسطة: ' + log.user"></div>
+                                <div x-show="log.old_values" class="mt-2">
+                                    <div class="text-xs font-bold text-red-500 mb-1">القيم السابقة:</div>
+                                    <pre class="text-[10px] bg-white p-2 rounded border overflow-x-auto"
+                                        x-text="log.old_values"></pre>
+                                </div>
+                                <div x-show="log.new_values" class="mt-2">
+                                    <div class="text-xs font-bold text-green-600 mb-1">القيم الجديدة:</div>
+                                    <pre class="text-[10px] bg-white p-2 rounded border overflow-x-auto"
+                                        x-text="log.new_values"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div class="p-4 bg-gray-50 border-t flex justify-end">
+                <button @click="showMovementHistoryModal = false"
+                    class="bg-indigo-600 text-white px-6 py-2 rounded font-bold hover:bg-indigo-700">إغلاق</button>
+            </div>
+        </div>
+    </div>
+    <!-- Toast Notifications -->
+    <div class="fixed bottom-6 left-6 z-[200] space-y-3 w-80 pointer-events-none">
+        <template x-for="n in notifications" :key="n.id">
+            <div x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 -translate-x-10" x-transition:enter-end="opacity-100 translate-x-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 -translate-x-10"
+                class="p-4 rounded-2xl shadow-2xl flex items-center gap-3 border bg-white/90 backdrop-blur-md pointer-events-auto"
+                :class="n.type === 'error' ? 'border-red-100 text-red-800 bg-red-50/90' : 'border-indigo-100 text-indigo-950 bg-white/90'">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                    :class="n.type === 'error' ? 'bg-red-100' : 'bg-indigo-100'">
+                    <span class="text-lg" x-text="n.type === 'error' ? '⚠️' : '✨'"></span>
+                </div>
+                <div class="text-sm font-black" x-text="n.message"></div>
+            </div>
+        </template>
+    </div>
+
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/routing.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/expenses.js"></script>
+    <script src="js/forms.js"></script>
+    <script src="js/warehouse.js"></script>
+    <script src="js/audit.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="app.js"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</body>
+
+</html>

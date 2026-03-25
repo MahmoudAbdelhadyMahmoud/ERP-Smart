@@ -1,0 +1,18 @@
+<!-- System Locked Overlay -->
+<div x-show="systemLocked && view !== 'audit'"
+    class="fixed inset-0 z-[100] bg-black bg-opacity-80 flex flex-col items-center justify-center text-white p-6 text-center"
+    x-cloak>
+    <div class="bg-red-600 p-8 rounded-2xl shadow-2xl max-w-lg border-4 border-white">
+        <span class="text-6xl mb-4">🚫</span>
+        <h1 class="text-3xl font-bold mb-4">النظام متوقف مؤقتاً</h1>
+        <p class="text-xl mb-6">يجب تسجيل جرد المخزن الفعلي لنهاية الشهر الماضي قبل مواصلة العمل على النظام.</p>
+        <button @click="navigate('audit')"
+            class="bg-white text-red-600 px-8 py-3 rounded-xl font-bold text-lg hover:bg-gray-100 transition shadow-lg mb-4 w-full">
+            انتقل لصفحة الجرد الآن
+        </button>
+        <button @click="skipAuditManual()"
+            class="text-white text-sm underline opacity-80 hover:opacity-100 block w-full text-center">
+            تخطي الجرد لفتح النظام الآن
+        </button>
+    </div>
+</div>

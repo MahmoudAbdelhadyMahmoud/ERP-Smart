@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html :lang="lang" :dir="lang === 'ar' ? 'rtl' : 'ltr'" x-data="expenseApp()">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المصروفات الذكي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Inter:wght@400;700;900&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        [x-cloak] { display: none !important; }
+        :lang(ar) { font-family: 'Cairo', sans-serif; }
+        :lang(en) { font-family: 'Inter', sans-serif; }
+        :lang(zh) { font-family: 'Noto Sans SC', sans-serif; }
+        body { transition: font-family 0.3s ease; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-200">
+    
+    {% include 'partials/system_locked.html' %}
+
+    <div class="min-h-screen flex">
+        {% include 'partials/sidebar.html' %}
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col">
+            {% include 'partials/header.html' %}
+
+            <main class="p-6">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    {% include 'partials/modals.html' %}
+    {% include 'partials/toasts.html' %}
+
+    <!-- Scripts -->
+    <script src="/js/i18n.js"></script>
+    <script src="/js/state.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/routing.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/expenses.js"></script>
+    <script src="/js/forms.js"></script>
+    <script src="/js/warehouse.js"></script>
+    <script src="/js/audit.js"></script>
+    <script src="/js/charts.js"></script>
+    <script src="/js/settings.js"></script>
+    <script src="/js/costing.js"></script>
+    <script src="/app.js"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</body>
+</html>
