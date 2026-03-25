@@ -24,8 +24,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all project files into the container
 COPY . .
 
-# Hugging Face Spaces defaults to port 7860
-EXPOSE 7860
+# Railway provides the PORT environment variable
+# Port 7860 is used as a fallback if PORT is not set
+ENV PORT 8080
+EXPOSE 8080
 
-# Command to start the application with uvicorn on fixed port
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Shell-form CMD to support environment variable substitution ($PORT)
+CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT
