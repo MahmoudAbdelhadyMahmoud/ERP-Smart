@@ -6,5 +6,10 @@ pandas==2.2.0
 openpyxl==3.1.2
 pydantic==2.6.1
 pydantic-settings==2.1.0
-# Axios is a JS library, excluded from pip requirements
-# sqlite3 is a built-in Python module, excluded from pip requirements
+scikit-learn
+reportlab
+deep-translator
+arabic-reshaper
+python-bidi
+# Axios is a JS library, excluded from pip
+# sqlite3 is a built-in Python module, excluded from pip
