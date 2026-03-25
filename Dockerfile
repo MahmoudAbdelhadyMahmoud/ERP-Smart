@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED 1
 # Set the working directory inside the container
 WORKDIR /app
 
-# Install system dependencies (needed for Pandas, ReportLab, etc.)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
@@ -24,10 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all project files into the container
 COPY . .
 
-# Railway provides the PORT environment variable
-# Port 7860 is used as a fallback if PORT is not set
-ENV PORT 8080
+# Railway defaults to port 8080 which is our standard here
 EXPOSE 8080
 
-# Shell-form CMD to support environment variable substitution ($PORT)
-CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+# Hardcoded port 8080 to avoid any dynamic port substitution errors ($PORT string issues)
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
